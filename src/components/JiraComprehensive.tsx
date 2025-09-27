@@ -1,0 +1,512 @@
+import { useState, useEffect } from 'react';
+import {
+  CheckCircle, Circle, Clock, AlertCircle, User, Tag, Calendar,
+  RefreshCw, Plus, Settings, Trash2, ChevronRight, Cloud, Server,
+  Database, GitBranch, Link2, ArrowLeft, Search, Filter
+} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
+import jiraService from '../services/jiraService';
+import type { JiraAccount, JiraBoard, JiraTicket, CreateJiraAccountDto } from '../types/jira.types';
+import { useProjectContext } from '../context/ProjectContext';
+import JiraAccountModal from './jira/JiraAccountModal';
+
+const JiraComprehensive = () => {
+  const { selectedProject } = useProjectContext();
+  const [view, setView] = useState<'accounts' | 'boards' | 'tickets'>('accounts');
+  const [accounts, setAccounts] = useState<JiraAccount[]>([]);
+  const [boards, setBoards] = useState<JiraBoard[]>([]);
+  const [tickets, setTickets] = useState<JiraTicket[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<JiraAccount | null>(null);
+  const [selectedBoard, setSelectedBoard] = useState<JiraBoard | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [showAccountForm, setShowAccountForm] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<JiraAccount | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    loadAccounts();
+  }, [selectedProject]);
+
+  const loadAccounts = async () => {
+    setLoading(true);
+    try {
+      const data = await jiraService.getAccounts(selectedProject?.id);
+      setAccounts(data);
+    } catch (error) {
+      console.error('Failed to load accounts:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadBoards = async (accountId: string) => {
+    setLoading(true);
+    try {
+      const data = await jiraService.getBoards(accountId);
+      console.log('Loaded boards data:', data);
+      setBoards(data);
+    } catch (error) {
+      console.error('Failed to load boards:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadTickets = async (boardId: string) => {
+    setLoading(true);
+    try {
+      const params: any = { boardId };
+
+      const response = await jiraService.getTickets(params);
+      setTickets(response?.tickets || []);
+    } catch (error) {
+      console.error('Failed to load tickets:', error);
+      setTickets([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSyncAccount = async (account: JiraAccount) => {
+    setSyncing(true);
+    try {
+      await jiraService.syncAccount(account.id);
+      await loadAccounts();
+    } catch (error) {
+      console.error('Sync failed:', error);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleDeleteAccount = async (account: JiraAccount) => {
+    if (window.confirm(`Are you sure you want to delete the account "${account.accountName}"?`)) {
+      try {
+        await jiraService.deleteAccount(account.id);
+        await loadAccounts();
+      } catch (error) {
+        console.error('Failed to delete account:', error);
+      }
+    }
+  };
+
+  const handleAccountClick = (account: JiraAccount) => {
+    setSelectedAccount(account);
+    setView('boards');
+    loadBoards(account.id);
+  };
+
+  const handleBoardClick = (board: JiraBoard) => {
+    setSelectedBoard(board);
+    setView('tickets');
+    loadTickets(board.id);
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'done': return <CheckCircle className="w-5 h-5 text-green-600" />;
+      case 'in progress': return <Clock className="w-5 h-5 text-blue-600" />;
+      case 'in review': return <AlertCircle className="w-5 h-5 text-yellow-600" />;
+      default: return <Circle className="w-5 h-5 text-gray-400" />;
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority?.toLowerCase()) {
+      case 'critical': case 'highest': return 'bg-red-100 text-red-800 border-red-200';
+      case 'high': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'low': case 'lowest': return 'bg-green-100 text-green-800 border-green-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const stats = {
+    totalAccounts: accounts?.length || 0,
+    activeAccounts: accounts?.filter(a => a.isActive)?.length || 0,
+    totalBoards: boards?.length || 0,
+    totalTickets: tickets?.length || 0,
+    openTickets: tickets?.filter(t => t.status !== 'Done' && t.status !== 'Closed')?.length || 0,
+    linkedPRs: tickets?.filter(t => t.pullRequests && t.pullRequests.length > 0)?.length || 0
+  };
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="mb-8 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Jira Management</h1>
+          <p className="text-gray-600 mt-2">
+            {view === 'accounts' && 'Manage your Jira accounts and integrations'}
+            {view === 'boards' && `Boards for ${selectedAccount?.accountName}`}
+            {view === 'tickets' && `Tickets in ${selectedBoard?.name}`}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {view !== 'accounts' && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (view === 'tickets') {
+                  setView('boards');
+                } else {
+                  setView('accounts');
+                  setSelectedAccount(null);
+                }
+              }}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+          )}
+          <Button variant="outline" onClick={loadAccounts} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          {view === 'accounts' && (
+            <Button onClick={() => setShowAccountForm(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Account
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Project Indicator */}
+      {selectedProject && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-blue-700">Filtered by project:</span>
+            <span className="font-medium text-blue-900">{selectedProject.name}</span>
+            {selectedProject.jiraKey && (
+              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                Jira Key: {selectedProject.jiraKey}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Total Accounts</p>
+                <p className="text-2xl font-bold">{stats.totalAccounts}</p>
+                <p className="text-xs text-gray-500">{stats.activeAccounts} active</p>
+              </div>
+              <User className="w-8 h-8 text-blue-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Boards</p>
+                <p className="text-2xl font-bold">{stats.totalBoards}</p>
+              </div>
+              <Database className="w-8 h-8 text-green-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Open Tickets</p>
+                <p className="text-2xl font-bold">{stats.openTickets}</p>
+                <p className="text-xs text-gray-500">of {stats.totalTickets} total</p>
+              </div>
+              <AlertCircle className="w-8 h-8 text-yellow-500" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Linked PRs</p>
+                <p className="text-2xl font-bold">{stats.linkedPRs}</p>
+              </div>
+              <GitBranch className="w-8 h-8 text-purple-500" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Accounts View */}
+      {view === 'accounts' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {loading ? (
+            <div className="col-span-full text-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            </div>
+          ) : accounts.length === 0 ? (
+            <Card className="col-span-full">
+              <CardContent className="text-center py-12">
+                <Database className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Jira Accounts</h3>
+                <p className="text-gray-500 mb-4">Get started by adding your first Jira account</p>
+                <Button onClick={() => setShowAccountForm(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Account
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            accounts.map(account => {
+              const isCloud = account.jiraUrl.includes('atlassian.net');
+              return (
+                <Card
+                  key={account.id}
+                  className="hover:shadow-lg transition-shadow cursor-pointer"
+                  onClick={() => handleAccountClick(account)}
+                >
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        {isCloud ? <Cloud className="w-5 h-5 text-blue-500" /> : <Server className="w-5 h-5 text-gray-500" />}
+                        <CardTitle className="text-base">{account.accountName}</CardTitle>
+                      </div>
+                      <Badge variant={account.isActive ? "default" : "secondary"}>
+                        {account.isActive ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 text-sm text-gray-600">
+                      <p>{account.email}</p>
+                      <p className="text-xs truncate">{account.jiraUrl}</p>
+                      {account.boards && (
+                        <p className="font-medium">{account.boards.length} boards</p>
+                      )}
+                    </div>
+                    <div className="flex gap-2 mt-4">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSyncAccount(account);
+                        }}
+                        disabled={syncing}
+                      >
+                        <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingAccount(account);
+                          setShowAccountForm(true);
+                        }}
+                      >
+                        <Settings className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* Boards View */}
+      {view === 'boards' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {loading ? (
+            <div className="col-span-full text-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            </div>
+          ) : boards.map(board => (
+            <Card
+              key={board.id}
+              className="hover:shadow-lg transition-shadow"
+            >
+              <CardHeader>
+                <CardTitle className="text-base">{board.name}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm text-gray-600">
+                  {board.type && <p>Type: {board.type}</p>}
+                  {board.projectKey && <p>Project: {board.projectKey}</p>}
+                  {board.tickets && <p>{board.tickets.length} tickets</p>}
+                  {board.lastSyncedAt && (
+                    <p className="text-xs">Last synced: {new Date(board.lastSyncedAt).toLocaleString()}</p>
+                  )}
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <Button
+                    className="flex-1"
+                    variant="outline"
+                    onClick={() => handleBoardClick(board)}
+                  >
+                    <ChevronRight className="w-4 h-4 mr-2" />
+                    View
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      setSyncing(true);
+                      try {
+                        await jiraService.syncBoard(board.id);
+                        console.log(`Synced board ${board.name}`);
+                        // Reload tickets if this is the selected board
+                        if (selectedBoard?.id === board.id) {
+                          await loadTickets(board.id);
+                        }
+                      } catch (error) {
+                        console.error('Failed to sync board:', error);
+                      } finally {
+                        setSyncing(false);
+                      }
+                    }}
+                    disabled={syncing}
+                  >
+                    <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Tickets View */}
+      {view === 'tickets' && (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="p-6 border-b">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Tickets</h2>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    if (selectedBoard) {
+                      setSyncing(true);
+                      try {
+                        await jiraService.syncTickets(selectedBoard.id);
+                        console.log(`Syncing tickets for board ${selectedBoard.name}`);
+                        await loadTickets(selectedBoard.id);
+                      } catch (error) {
+                        console.error('Failed to sync tickets:', error);
+                      } finally {
+                        setSyncing(false);
+                      }
+                    }
+                  }}
+                  disabled={syncing}
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                  Sync Tickets
+                </Button>
+                <Button variant="outline" size="sm">
+                  <Filter className="w-4 h-4 mr-2" />
+                  Filter
+                </Button>
+                <Button variant="outline" size="sm">
+                  <Search className="w-4 h-4 mr-2" />
+                  Search
+                </Button>
+              </div>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Issue</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assignee</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">PRs</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {tickets.map(ticket => (
+                  <tr key={ticket.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      <div>
+                        <p className="text-sm font-medium text-blue-600">{ticket.key}</p>
+                        <p className="text-sm text-gray-900">{ticket.summary}</p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        {getStatusIcon(ticket.status)}
+                        <span className="text-sm">{ticket.status}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {ticket.priority && (
+                        <span className={`px-2 py-1 text-xs font-medium rounded border ${getPriorityColor(ticket.priority)}`}>
+                          {ticket.priority}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      {ticket.assignee && (
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4" />
+                          <span className="text-sm">{ticket.assignee.displayName}</span>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      {ticket.pullRequests && ticket.pullRequests.length > 0 && (
+                        <Badge variant="outline">
+                          <GitBranch className="w-3 h-3 mr-1" />
+                          {ticket.pullRequests.length}
+                        </Badge>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Account Modal */}
+      <JiraAccountModal
+        open={showAccountForm}
+        account={editingAccount}
+        onClose={() => {
+          setShowAccountForm(false);
+          setEditingAccount(null);
+        }}
+        onSave={async (data) => {
+          try {
+            if (editingAccount) {
+              await jiraService.updateAccount(editingAccount.id, data);
+            } else {
+              const accountData = {
+                ...data,
+                projectId: selectedProject?.id
+              };
+              await jiraService.createAccount(accountData as CreateJiraAccountDto);
+            }
+            await loadAccounts();
+            setShowAccountForm(false);
+            setEditingAccount(null);
+          } catch (error) {
+            console.error('Failed to save account:', error);
+          }
+        }}
+      />
+    </div>
+  );
+};
+
+export default JiraComprehensive;
