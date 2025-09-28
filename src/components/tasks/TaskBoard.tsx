@@ -1,8 +1,18 @@
-import React from 'react';
-import { DndContext, DragEndEvent, closestCenter } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { Task, TaskStatus } from '@/types/task.types';
-import TaskCard from './TaskCard';
+import React, { useState } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import type { DragEndEvent, DragStartEvent, DragOverEvent } from "@dnd-kit/core";
+import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { TaskStatus, type Task } from "@/types";
+import TaskCard from "./TaskCard";
+import DroppableColumn from "./DroppableColumn";
 
 interface TaskBoardProps {
   tasks: Task[];
@@ -19,75 +29,138 @@ const TaskBoard: React.FC<TaskBoardProps> = ({
   onStatusChange,
   onViewDetails,
 }) => {
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   const columns: { status: TaskStatus; title: string; color: string }[] = [
-    { status: TaskStatus.TODO, title: 'To Do', color: 'border-gray-300' },
-    { status: TaskStatus.IN_PROGRESS, title: 'In Progress', color: 'border-blue-300' },
-    { status: TaskStatus.IN_REVIEW, title: 'In Review', color: 'border-yellow-300' },
-    { status: TaskStatus.DONE, title: 'Done', color: 'border-green-300' },
-    { status: TaskStatus.BLOCKED, title: 'Blocked', color: 'border-red-300' },
+    { status: TaskStatus.TODO, title: "To Do", color: "border-gray-300" },
+    {
+      status: TaskStatus.IN_PROGRESS,
+      title: "In Progress",
+      color: "border-blue-300",
+    },
+    {
+      status: TaskStatus.IN_REVIEW,
+      title: "In Review",
+      color: "border-yellow-300",
+    },
+    { status: TaskStatus.DONE, title: "Done", color: "border-green-300" },
+    { status: TaskStatus.BLOCKED, title: "Blocked", color: "border-red-300" },
   ];
 
   const getTasksByStatus = (status: TaskStatus) => {
-    return tasks.filter(task => task.status === status);
+    return tasks.filter((task) => task.status === status);
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const taskId = event.active.id as string;
+    const task = tasks.find((t) => t.id === taskId);
+    if (task) {
+      setActiveTask(task);
+    }
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+
+    if (!over) return;
+
+    const taskId = active.id as string;
+    const overId = over.id as string;
+
+    // Check if we're dragging over a column
+    const overColumn = columns.find((col) => col.status === overId);
+    if (overColumn) {
+      const task = tasks.find((t) => t.id === taskId);
+      if (task && task.status !== overColumn.status) {
+        // Update task status immediately for smooth UX
+        onStatusChange(taskId, overColumn.status);
+      }
+    }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
-    if (over && active.id !== over.id) {
-      const taskId = active.id as string;
-      const newStatus = over.id as TaskStatus;
-      onStatusChange(taskId, newStatus);
+    if (!over) {
+      setActiveTask(null);
+      return;
     }
+
+    const taskId = active.id as string;
+    const overId = over.id as string;
+
+    // Check if dropped on a column
+    const overColumn = columns.find((col) => col.status === overId);
+    if (overColumn) {
+      const task = tasks.find((t) => t.id === taskId);
+      if (task && task.status !== overColumn.status) {
+        onStatusChange(taskId, overColumn.status);
+      }
+    } else {
+      // Dropped on another task - find which column it belongs to
+      const overTask = tasks.find((t) => t.id === overId);
+      if (overTask) {
+        const task = tasks.find((t) => t.id === taskId);
+        if (task && task.status !== overTask.status) {
+          onStatusChange(taskId, overTask.status);
+        }
+      }
+    }
+
+    setActiveTask(null);
   };
 
   return (
-    <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+    >
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {columns.map(column => {
+        {columns.map((column) => {
           const columnTasks = getTasksByStatus(column.status);
           return (
-            <div
+            <DroppableColumn
               key={column.status}
-              className={`bg-gray-50 rounded-lg p-4 min-h-[500px] border-t-4 ${column.color}`}
-            >
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-semibold text-sm uppercase tracking-wider">
-                  {column.title}
-                </h3>
-                <span className="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded-full">
-                  {columnTasks.length}
-                </span>
-              </div>
-
-              <SortableContext
-                items={columnTasks.map(t => t.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                <div className="space-y-3">
-                  {columnTasks.map(task => (
-                    <div key={task.id} className="cursor-move">
-                      <TaskCard
-                        task={task}
-                        onEdit={onEdit}
-                        onDelete={onDelete}
-                        onStatusChange={onStatusChange}
-                        onViewDetails={onViewDetails}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </SortableContext>
-
-              {columnTasks.length === 0 && (
-                <div className="text-center py-8 text-gray-400 text-sm">
-                  No tasks
-                </div>
-              )}
-            </div>
+              status={column.status}
+              title={column.title}
+              color={column.color}
+              tasks={columnTasks}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onStatusChange={onStatusChange}
+              onViewDetails={onViewDetails}
+            />
           );
         })}
       </div>
+
+      <DragOverlay>
+        {activeTask ? (
+          <div className="opacity-80 rotate-3 shadow-2xl">
+            <TaskCard
+              task={activeTask}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onStatusChange={onStatusChange}
+              onViewDetails={onViewDetails}
+            />
+          </div>
+        ) : null}
+      </DragOverlay>
     </DndContext>
   );
 };

@@ -1,16 +1,39 @@
-import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon } from 'lucide-react';
-import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
-import { Task, TaskStatus, TaskPriority, CreateTaskDto, UpdateTaskDto } from '@/types/task.types';
+import React, { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import {
+  TaskStatus,
+  TaskPriority,
+  type Task,
+  type CreateTaskDto,
+  type UpdateTaskDto,
+} from "@/types";
+import { useProjectContext } from "@/context/ProjectContext";
 
 interface TaskFormProps {
   task?: Task | null;
@@ -19,19 +42,25 @@ interface TaskFormProps {
   onClose: () => void;
 }
 
-const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, onSubmit, onClose }) => {
+const TaskForm: React.FC<TaskFormProps> = ({
+  task,
+  projectId,
+  onSubmit,
+  onClose,
+}) => {
+  const { selectedProject } = useProjectContext();
   const [formData, setFormData] = useState({
-    title: task?.title || '',
-    description: task?.description || '',
+    title: task?.title || "",
+    description: task?.description || "",
     status: task?.status || TaskStatus.TODO,
     priority: task?.priority || TaskPriority.MEDIUM,
-    assignee: task?.assignee || '',
-    reporter: task?.reporter || '',
+    assignee: task?.assignee || "",
+    reporter: task?.reporter || "",
     estimatedHours: task?.estimatedHours || 0,
     actualHours: task?.actualHours || 0,
-    tags: task?.tags?.join(', ') || '',
-    labels: task?.labels?.join(', ') || '',
-    projectId: task?.projectId || projectId || '',
+    tags: task?.tags?.join(", ") || "",
+    labels: task?.labels?.join(", ") || "",
+    projectId: task?.projectId || projectId || selectedProject?.id || "",
   });
 
   const [dueDate, setDueDate] = useState<Date | undefined>(
@@ -45,28 +74,41 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, onSubmit, onClose 
     e.preventDefault();
     const data: any = {
       ...formData,
-      tags: formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
-      labels: formData.labels ? formData.labels.split(',').map(l => l.trim()).filter(Boolean) : [],
+      tags: formData.tags
+        ? formData.tags
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean)
+        : [],
+      labels: formData.labels
+        ? formData.labels
+            .split(",")
+            .map((l) => l.trim())
+            .filter(Boolean)
+        : [],
       dueDate: dueDate?.toISOString(),
       startDate: startDate?.toISOString(),
     };
 
     if (task) {
       delete data.projectId;
+    } else {
+      // Do not include actualHours on creation
+      delete data.actualHours;
     }
 
     onSubmit(data);
   };
 
   const handleChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{task ? 'Edit Task' : 'Create New Task'}</DialogTitle>
+          <DialogTitle>{task ? "Edit Task" : "Create New Task"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -75,7 +117,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, onSubmit, onClose 
             <Input
               id="title"
               value={formData.title}
-              onChange={(e) => handleChange('title', e.target.value)}
+              onChange={(e) => handleChange("title", e.target.value)}
               required
               placeholder="Enter task title"
             />
@@ -86,7 +128,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, onSubmit, onClose 
             <Textarea
               id="description"
               value={formData.description}
-              onChange={(e) => handleChange('description', e.target.value)}
+              onChange={(e) => handleChange("description", e.target.value)}
               placeholder="Enter task description"
               rows={3}
             />
@@ -95,24 +137,36 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, onSubmit, onClose 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
-              <Select value={formData.status} onValueChange={(value) => handleChange('status', value)}>
+              <Select
+                value={formData.status}
+                onValueChange={(value) => handleChange("status", value)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={TaskStatus.TODO}>To Do</SelectItem>
-                  <SelectItem value={TaskStatus.IN_PROGRESS}>In Progress</SelectItem>
-                  <SelectItem value={TaskStatus.IN_REVIEW}>In Review</SelectItem>
+                  <SelectItem value={TaskStatus.IN_PROGRESS}>
+                    In Progress
+                  </SelectItem>
+                  <SelectItem value={TaskStatus.IN_REVIEW}>
+                    In Review
+                  </SelectItem>
                   <SelectItem value={TaskStatus.DONE}>Done</SelectItem>
                   <SelectItem value={TaskStatus.BLOCKED}>Blocked</SelectItem>
-                  <SelectItem value={TaskStatus.CANCELLED}>Cancelled</SelectItem>
+                  <SelectItem value={TaskStatus.CANCELLED}>
+                    Cancelled
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="priority">Priority</Label>
-              <Select value={formData.priority} onValueChange={(value) => handleChange('priority', value)}>
+              <Select
+                value={formData.priority}
+                onValueChange={(value) => handleChange("priority", value)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -120,7 +174,9 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, onSubmit, onClose 
                   <SelectItem value={TaskPriority.LOW}>Low</SelectItem>
                   <SelectItem value={TaskPriority.MEDIUM}>Medium</SelectItem>
                   <SelectItem value={TaskPriority.HIGH}>High</SelectItem>
-                  <SelectItem value={TaskPriority.CRITICAL}>Critical</SelectItem>
+                  <SelectItem value={TaskPriority.CRITICAL}>
+                    Critical
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -132,7 +188,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, onSubmit, onClose 
               <Input
                 id="assignee"
                 value={formData.assignee}
-                onChange={(e) => handleChange('assignee', e.target.value)}
+                onChange={(e) => handleChange("assignee", e.target.value)}
                 placeholder="Enter assignee name"
               />
             </div>
@@ -142,7 +198,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, onSubmit, onClose 
               <Input
                 id="reporter"
                 value={formData.reporter}
-                onChange={(e) => handleChange('reporter', e.target.value)}
+                onChange={(e) => handleChange("reporter", e.target.value)}
                 placeholder="Enter reporter name"
               />
             </div>
@@ -156,12 +212,16 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, onSubmit, onClose 
                   <Button
                     variant="outline"
                     className={cn(
-                      'w-full justify-start text-left font-normal',
-                      !startDate && 'text-muted-foreground'
+                      "w-full justify-start text-left font-normal",
+                      !startDate && "text-muted-foreground"
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {startDate ? format(startDate, 'PPP') : <span>Pick a date</span>}
+                    {startDate ? (
+                      format(startDate, "PPP")
+                    ) : (
+                      <span>Pick a date</span>
+                    )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
@@ -182,12 +242,16 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, onSubmit, onClose 
                   <Button
                     variant="outline"
                     className={cn(
-                      'w-full justify-start text-left font-normal',
-                      !dueDate && 'text-muted-foreground'
+                      "w-full justify-start text-left font-normal",
+                      !dueDate && "text-muted-foreground"
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dueDate ? format(dueDate, 'PPP') : <span>Pick a date</span>}
+                    {dueDate ? (
+                      format(dueDate, "PPP")
+                    ) : (
+                      <span>Pick a date</span>
+                    )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
@@ -210,7 +274,9 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, onSubmit, onClose 
                 type="number"
                 min="0"
                 value={formData.estimatedHours}
-                onChange={(e) => handleChange('estimatedHours', parseInt(e.target.value) || 0)}
+                onChange={(e) =>
+                  handleChange("estimatedHours", parseInt(e.target.value) || 0)
+                }
                 placeholder="0"
               />
             </div>
@@ -223,7 +289,9 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, onSubmit, onClose 
                   type="number"
                   min="0"
                   value={formData.actualHours}
-                  onChange={(e) => handleChange('actualHours', parseInt(e.target.value) || 0)}
+                  onChange={(e) =>
+                    handleChange("actualHours", parseInt(e.target.value) || 0)
+                  }
                   placeholder="0"
                 />
               </div>
@@ -235,7 +303,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, onSubmit, onClose 
             <Input
               id="tags"
               value={formData.tags}
-              onChange={(e) => handleChange('tags', e.target.value)}
+              onChange={(e) => handleChange("tags", e.target.value)}
               placeholder="feature, bug-fix, urgent"
             />
           </div>
@@ -245,7 +313,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, onSubmit, onClose 
             <Input
               id="labels"
               value={formData.labels}
-              onChange={(e) => handleChange('labels', e.target.value)}
+              onChange={(e) => handleChange("labels", e.target.value)}
               placeholder="frontend, backend, database"
             />
           </div>
@@ -255,7 +323,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ task, projectId, onSubmit, onClose 
               Cancel
             </Button>
             <Button type="submit">
-              {task ? 'Update Task' : 'Create Task'}
+              {task ? "Update Task" : "Create Task"}
             </Button>
           </DialogFooter>
         </form>

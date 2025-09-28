@@ -1,11 +1,23 @@
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreVertical, Clock, Calendar, User, Link, GitBranch } from 'lucide-react';
-import { Task, TaskStatus, TaskPriority } from '@/types/task.types';
-import tasksService from '@/services/tasks.service';
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  MoreVertical,
+  Clock,
+  Calendar,
+  User,
+  Link,
+  GitBranch,
+} from "lucide-react";
+import { TaskStatus, TaskPriority, type Task } from "@/types";
+import tasksService from "@/services/tasks.service";
 
 interface TaskCardProps {
   task: Task;
@@ -24,27 +36,27 @@ const TaskCard: React.FC<TaskCardProps> = ({
 }) => {
   const getStatusBadge = (status: TaskStatus) => {
     const colors: Record<TaskStatus, string> = {
-      [TaskStatus.TODO]: 'bg-gray-500',
-      [TaskStatus.IN_PROGRESS]: 'bg-blue-500',
-      [TaskStatus.IN_REVIEW]: 'bg-yellow-500',
-      [TaskStatus.DONE]: 'bg-green-500',
-      [TaskStatus.BLOCKED]: 'bg-red-500',
-      [TaskStatus.CANCELLED]: 'bg-gray-400',
+      [TaskStatus.TODO]: "bg-gray-500",
+      [TaskStatus.IN_PROGRESS]: "bg-blue-500",
+      [TaskStatus.IN_REVIEW]: "bg-yellow-500",
+      [TaskStatus.DONE]: "bg-green-500",
+      [TaskStatus.BLOCKED]: "bg-red-500",
+      [TaskStatus.CANCELLED]: "bg-gray-400",
     };
 
     return (
       <Badge className={`${colors[status]} text-white`}>
-        {status.replace('_', ' ')}
+        {status.replace("_", " ")}
       </Badge>
     );
   };
 
   const getPriorityBadge = (priority: TaskPriority) => {
     const colors: Record<TaskPriority, string> = {
-      [TaskPriority.LOW]: 'bg-gray-200 text-gray-700',
-      [TaskPriority.MEDIUM]: 'bg-yellow-200 text-yellow-800',
-      [TaskPriority.HIGH]: 'bg-orange-200 text-orange-800',
-      [TaskPriority.CRITICAL]: 'bg-red-200 text-red-800',
+      [TaskPriority.LOW]: "bg-gray-200 text-gray-700",
+      [TaskPriority.MEDIUM]: "bg-yellow-200 text-yellow-800",
+      [TaskPriority.HIGH]: "bg-orange-200 text-orange-800",
+      [TaskPriority.CRITICAL]: "bg-red-200 text-red-800",
     };
 
     return (
@@ -56,26 +68,31 @@ const TaskCard: React.FC<TaskCardProps> = ({
 
   const formatDate = (date?: string) => {
     if (!date) return null;
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
+    return new Date(date).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
     });
   };
 
   const getDueDateColor = (dueDate?: string) => {
-    if (!dueDate) return '';
+    if (!dueDate) return "";
     const due = new Date(dueDate);
     const now = new Date();
-    const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.ceil(
+      (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+    );
 
-    if (diffDays < 0) return 'text-red-600';
-    if (diffDays <= 3) return 'text-yellow-600';
-    return 'text-gray-600';
+    if (diffDays < 0) return "text-red-600";
+    if (diffDays <= 3) return "text-yellow-600";
+    return "text-gray-600";
   };
 
   return (
-    <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => onViewDetails(task)}>
+    <Card
+      className="hover:shadow-lg transition-shadow cursor-pointer"
+      onClick={() => onViewDetails(task)}
+    >
       <CardHeader className="pb-3">
         <div className="flex justify-between items-start">
           <CardTitle className="text-lg font-medium line-clamp-2">
@@ -88,12 +105,20 @@ const TaskCard: React.FC<TaskCardProps> = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(task); }}>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(task);
+                }}
+              >
                 Edit
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-red-600"
-                onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(task.id);
+                }}
               >
                 Delete
               </DropdownMenuItem>
@@ -121,7 +146,11 @@ const TaskCard: React.FC<TaskCardProps> = ({
           )}
 
           {task.dueDate && (
-            <div className={`flex items-center gap-2 ${getDueDateColor(task.dueDate)}`}>
+            <div
+              className={`flex items-center gap-2 ${getDueDateColor(
+                task.dueDate
+              )}`}
+            >
               <Calendar className="h-3 w-3" />
               <span>Due {formatDate(task.dueDate)}</span>
             </div>
@@ -138,13 +167,17 @@ const TaskCard: React.FC<TaskCardProps> = ({
 
           {task.links && task.links.length > 0 && (
             <div className="flex items-center gap-2 mt-2">
-              {task.links.some(link => link.linkType === 'jira_ticket') && (
+              {task.links.some((link) => link.linkType === "jira_ticket") && (
                 <Badge variant="outline" className="text-xs">
                   <Link className="h-3 w-3 mr-1" />
                   Jira
                 </Badge>
               )}
-              {task.links.some(link => link.linkType === 'pull_request' || link.linkType === 'merge_request') && (
+              {task.links.some(
+                (link) =>
+                  link.linkType === "pull_request" ||
+                  link.linkType === "merge_request"
+              ) && (
                 <Badge variant="outline" className="text-xs">
                   <GitBranch className="h-3 w-3 mr-1" />
                   PR

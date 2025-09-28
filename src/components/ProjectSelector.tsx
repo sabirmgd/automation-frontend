@@ -1,15 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronDown, Search, Folder, Check } from 'lucide-react';
-import { useProjectContext } from '../context/ProjectContext';
+import React, { useState, useEffect } from "react";
+import { ChevronDown, Search, Folder, Check } from "lucide-react";
+import { useProjectContext } from "../context/ProjectContext";
 
 interface ProjectSelectorProps {
   className?: string;
 }
 
-const ProjectSelector: React.FC<ProjectSelectorProps> = ({ className = '' }) => {
-  const { selectedProject, setSelectedProject, projects, setProjects, loading, setLoading } = useProjectContext();
+const ProjectSelector: React.FC<ProjectSelectorProps> = ({
+  className = "",
+}) => {
+  const {
+    selectedProject,
+    setSelectedProject,
+    projects,
+    setProjects,
+    loading,
+    setLoading,
+  } = useProjectContext();
   const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     fetchProjects();
@@ -18,40 +27,46 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ className = '' }) => 
   const fetchProjects = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:3333/projects');
+      const response = await fetch("http://localhost:3000/projects");
       if (response.ok) {
         const data = await response.json();
         // The API returns paginated data with { data: [], total: number, page: number, lastPage: number }
         const projectList = data.data || [];
         setProjects(projectList);
-        console.log('Loaded projects:', projectList);
+        console.log("Loaded projects:", projectList);
       } else {
-        console.error('Failed to fetch projects:', response.status, response.statusText);
+        console.error(
+          "Failed to fetch projects:",
+          response.status,
+          response.statusText
+        );
         setProjects([]);
       }
     } catch (error) {
-      console.error('Failed to fetch projects:', error);
+      console.error("Failed to fetch projects:", error);
       setProjects([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredProjects = projects.filter(project =>
-    project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (project.key && project.key.toLowerCase().includes(searchTerm.toLowerCase()))
+  const filteredProjects = projects.filter(
+    (project) =>
+      project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (project.key &&
+        project.key.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const handleProjectSelect = (project: typeof projects[0]) => {
+  const handleProjectSelect = (project: (typeof projects)[0]) => {
     setSelectedProject(project);
     setIsOpen(false);
-    setSearchTerm('');
+    setSearchTerm("");
   };
 
   const handleClearSelection = () => {
     setSelectedProject(null);
     setIsOpen(false);
-    setSearchTerm('');
+    setSearchTerm("");
   };
 
   return (
@@ -63,10 +78,14 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ className = '' }) => 
         <div className="flex items-center">
           <Folder className="w-4 h-4 mr-2 text-gray-500" />
           <span className="text-sm font-medium">
-            {selectedProject ? selectedProject.name : 'Select a project'}
+            {selectedProject ? selectedProject.name : "Select a project"}
           </span>
         </div>
-        <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown
+          className={`w-4 h-4 text-gray-500 transition-transform ${
+            isOpen ? "rotate-180" : ""
+          }`}
+        />
       </button>
 
       {isOpen && (
@@ -109,7 +128,9 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ className = '' }) => 
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center">
-                        <span className="font-medium text-sm">{project.name}</span>
+                        <span className="font-medium text-sm">
+                          {project.name}
+                        </span>
                         {project.key && (
                           <span className="ml-2 px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-xs rounded">
                             {project.key}
@@ -152,10 +173,7 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ className = '' }) => 
       )}
 
       {isOpen && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setIsOpen(false)}
-        />
+        <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
       )}
     </div>
   );

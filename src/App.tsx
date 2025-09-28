@@ -5,6 +5,8 @@ import Projects from './components/Projects';
 import JiraComprehensive from './components/JiraComprehensive';
 import GitManagement from './components/GitManagement';
 import Tasks from './pages/Tasks';
+import { CronsPage } from './pages/CronsPage';
+import { CronDetailsPage } from './pages/CronDetailsPage';
 
 function App() {
   return (
@@ -15,6 +17,8 @@ function App() {
             <Route index element={<Navigate to="/projects" replace />} />
             <Route path="projects" element={<Projects />} />
             <Route path="tasks" element={<Tasks />} />
+            <Route path="crons" element={<CronsPage />} />
+            <Route path="crons/:id" element={<CronDetailsPage />} />
             <Route path="jira" element={<JiraComprehensive />} />
             <Route path="git" element={<GitManagement />} />
           </Route>

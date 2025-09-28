@@ -5,6 +5,7 @@ import {
   GitBranch,
   Layers,
   CheckSquare,
+  Clock,
   ChevronLeft,
   ChevronRight,
   Menu
@@ -31,6 +32,11 @@ const DashboardLayout = () => {
       name: 'Tasks',
       icon: <CheckSquare className="w-5 h-5" />,
       path: '/tasks'
+    },
+    {
+      name: 'Cron Jobs',
+      icon: <Clock className="w-5 h-5" />,
+      path: '/crons'
     },
     {
       name: 'Jira',

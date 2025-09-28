@@ -119,6 +119,31 @@ class JiraService {
     const { data } = await apiClient.get(`/jira/boards/${boardId}/stats`);
     return data;
   }
+
+  // Ticket Details
+  async getTicketComments(ticketId: string): Promise<any[]> {
+    const { data } = await apiClient.get(`/jira/tickets/${ticketId}/comments`);
+    return data;
+  }
+
+  async getTicketAttachments(ticketId: string): Promise<any[]> {
+    const { data } = await apiClient.get(`/jira/tickets/${ticketId}/attachments`);
+    return data;
+  }
+
+  async getTicketDetails(ticketId: string): Promise<any> {
+    const { data } = await apiClient.get(`/jira/tickets/${ticketId}/details`);
+    return data;
+  }
+
+  async updateTicketDescription(ticketId: string, description: string): Promise<void> {
+    await apiClient.patch(`/jira/tickets/${ticketId}/description`, { description });
+  }
+
+  async addTicketComment(ticketId: string, comment: string): Promise<any> {
+    const { data } = await apiClient.post(`/jira/tickets/${ticketId}/comments`, { comment });
+    return data;
+  }
 }
 
 export default new JiraService();

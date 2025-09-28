@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import {
   CheckCircle, Circle, Clock, AlertCircle, User, Tag, Calendar,
   RefreshCw, Plus, Settings, Trash2, ChevronRight, Cloud, Server,
-  Database, GitBranch, Link2, ArrowLeft, Search, Filter
+  Database, GitBranch, Link2, ArrowLeft, Search, Filter, Eye
 } from 'lucide-react';
+import Select from 'react-select';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -11,6 +12,7 @@ import jiraService from '../services/jiraService';
 import type { JiraAccount, JiraBoard, JiraTicket, CreateJiraAccountDto } from '../types/jira.types';
 import { useProjectContext } from '../context/ProjectContext';
 import JiraAccountModal from './jira/JiraAccountModal';
+import TicketDetailsModal from './jira/TicketDetailsModal';
 
 const JiraComprehensive = () => {
   const { selectedProject } = useProjectContext();
@@ -25,6 +27,12 @@ const JiraComprehensive = () => {
   const [showAccountForm, setShowAccountForm] = useState(false);
   const [editingAccount, setEditingAccount] = useState<JiraAccount | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTicket, setSelectedTicket] = useState<JiraTicket | null>(null);
+  const [showTicketDetails, setShowTicketDetails] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
+  const [assigneeFilter, setAssigneeFilter] = useState<string[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     loadAccounts();
@@ -105,6 +113,11 @@ const JiraComprehensive = () => {
     loadTickets(board.id);
   };
 
+  const handleViewTicketDetails = (ticket: JiraTicket) => {
+    setSelectedTicket(ticket);
+    setShowTicketDetails(true);
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {
       case 'done': return <CheckCircle className="w-5 h-5 text-green-600" />;
@@ -123,6 +136,27 @@ const JiraComprehensive = () => {
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
+
+  // Get unique values for filters
+  const uniqueStatuses = Array.from(new Set(tickets.map(t => t.status))).sort();
+  const uniquePriorities = Array.from(new Set(tickets.map(t => t.priority).filter(Boolean))).sort();
+  const uniqueAssignees = Array.from(new Set(tickets.map(t => t.assignee?.displayName).filter(Boolean))).sort();
+
+  // Convert to react-select options
+  const statusOptions = uniqueStatuses.map(status => ({ value: status, label: status }));
+  const priorityOptions = uniquePriorities.map(priority => ({ value: priority!, label: priority! }));
+  const assigneeOptions = uniqueAssignees.map(assignee => ({ value: assignee!, label: assignee! }));
+
+  // Filter tickets based on all filters
+  const filteredTickets = tickets.filter(ticket => {
+    const matchesStatus = statusFilter.length === 0 || statusFilter.includes(ticket.status);
+    const matchesPriority = priorityFilter.length === 0 || (ticket.priority && priorityFilter.includes(ticket.priority));
+    const matchesAssignee = assigneeFilter.length === 0 || (ticket.assignee && assigneeFilter.includes(ticket.assignee.displayName));
+    const matchesSearch = searchQuery === '' ||
+      ticket.key.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ticket.summary.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesStatus && matchesPriority && matchesAssignee && matchesSearch;
+  });
 
   const stats = {
     totalAccounts: accounts?.length || 0,
@@ -410,17 +444,112 @@ const JiraComprehensive = () => {
                   <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
                   Sync Tickets
                 </Button>
-                <Button variant="outline" size="sm">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={showFilters ? 'bg-gray-100' : ''}
+                >
                   <Filter className="w-4 h-4 mr-2" />
                   Filter
-                </Button>
-                <Button variant="outline" size="sm">
-                  <Search className="w-4 h-4 mr-2" />
-                  Search
                 </Button>
               </div>
             </div>
           </div>
+
+          {/* Filter Bar */}
+          {showFilters && (
+            <div className="p-4 bg-gray-50 border-b">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Status</label>
+                  <Select
+                    isMulti
+                    options={statusOptions}
+                    value={statusOptions.filter(opt => statusFilter.includes(opt.value))}
+                    onChange={(selected) => setStatusFilter(selected.map(s => s.value))}
+                    placeholder="Select statuses..."
+                    className="text-sm"
+                    classNamePrefix="react-select"
+                    styles={{
+                      control: (base) => ({...base, minHeight: '36px', borderColor: '#d1d5db'}),
+                      multiValue: (base) => ({...base, backgroundColor: '#e5e7eb'})
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Priority</label>
+                  <Select
+                    isMulti
+                    options={priorityOptions}
+                    value={priorityOptions.filter(opt => priorityFilter.includes(opt.value))}
+                    onChange={(selected) => setPriorityFilter(selected.map(s => s.value))}
+                    placeholder="Select priorities..."
+                    className="text-sm"
+                    classNamePrefix="react-select"
+                    styles={{
+                      control: (base) => ({...base, minHeight: '36px', borderColor: '#d1d5db'}),
+                      multiValue: (base) => ({...base, backgroundColor: '#e5e7eb'})
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Assignee</label>
+                  <Select
+                    isMulti
+                    options={assigneeOptions}
+                    value={assigneeOptions.filter(opt => assigneeFilter.includes(opt.value))}
+                    onChange={(selected) => setAssigneeFilter(selected.map(s => s.value))}
+                    placeholder="Select assignees..."
+                    className="text-sm"
+                    classNamePrefix="react-select"
+                    styles={{
+                      control: (base) => ({...base, minHeight: '36px', borderColor: '#d1d5db'}),
+                      multiValue: (base) => ({...base, backgroundColor: '#e5e7eb'})
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Search</label>
+                  <input
+                    type="text"
+                    placeholder="Search by key or summary..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-between items-center mt-4">
+                <div className="text-sm text-gray-600">
+                  Showing <span className="font-semibold">{filteredTickets.length}</span> of {tickets.length} tickets
+                  {(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0 || searchQuery) && (
+                    <span className="ml-2">
+                      ({statusFilter.length > 0 && `${statusFilter.length} status${statusFilter.length > 1 ? 'es' : ''}`}
+                      {priorityFilter.length > 0 && `${statusFilter.length > 0 ? ', ' : ''}${priorityFilter.length} priorit${priorityFilter.length > 1 ? 'ies' : 'y'}`}
+                      {assigneeFilter.length > 0 && `${(statusFilter.length > 0 || priorityFilter.length > 0) ? ', ' : ''}${assigneeFilter.length} assignee${assigneeFilter.length > 1 ? 's' : ''}`}
+                      {searchQuery && `${(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0) ? ', ' : ''}search: "${searchQuery}"`})
+                    </span>
+                  )}
+                </div>
+                {(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0 || searchQuery) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setStatusFilter([]);
+                      setPriorityFilter([]);
+                      setAssigneeFilter([]);
+                      setSearchQuery('');
+                    }}
+                  >
+                    Clear All Filters
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
@@ -430,10 +559,11 @@ const JiraComprehensive = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assignee</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">PRs</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {tickets.map(ticket => (
+                {filteredTickets.map(ticket => (
                   <tr key={ticket.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div>
@@ -470,6 +600,17 @@ const JiraComprehensive = () => {
                         </Badge>
                       )}
                     </td>
+                    <td className="px-6 py-4">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleViewTicketDetails(ticket)}
+                        className="hover:bg-blue-50"
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        View
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -504,6 +645,17 @@ const JiraComprehensive = () => {
             console.error('Failed to save account:', error);
           }
         }}
+      />
+
+      {/* Ticket Details Modal */}
+      <TicketDetailsModal
+        open={showTicketDetails}
+        onClose={() => {
+          setShowTicketDetails(false);
+          setSelectedTicket(null);
+        }}
+        ticketId={selectedTicket?.id || null}
+        ticketKey={selectedTicket?.key}
       />
     </div>
   );

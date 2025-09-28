@@ -1,19 +1,44 @@
-import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import React, { useState } from "react";
 import {
-  Calendar, Clock, User, Edit, Trash2, Link, ExternalLink,
-  GitBranch, Plus, X, AlertCircle
-} from 'lucide-react';
-import { Task, TaskLink, TaskLinkType, LinkTaskDto } from '@/types/task.types';
-import tasksService from '@/services/tasks.service';
-import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Calendar,
+  Clock,
+  User,
+  Edit,
+  Trash2,
+  Link,
+  ExternalLink,
+  GitBranch,
+  Plus,
+  X,
+  AlertCircle,
+} from "lucide-react";
+import {
+  TaskLinkType,
+  type Task,
+  type TaskLink,
+  type LinkTaskDto,
+} from "@/types";
+import tasksService from "@/services/tasks.service";
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 interface TaskDetailsProps {
   task: Task;
@@ -30,14 +55,14 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
   onDelete,
   onRefresh,
 }) => {
-  const [activeTab, setActiveTab] = useState('details');
+  const [activeTab, setActiveTab] = useState("details");
   const [showLinkForm, setShowLinkForm] = useState(false);
   const [linkFormData, setLinkFormData] = useState<Partial<LinkTaskDto>>({
     linkType: TaskLinkType.JIRA_TICKET,
-    externalId: '',
-    externalUrl: '',
-    title: '',
-    platform: 'jira',
+    externalId: "",
+    externalUrl: "",
+    title: "",
+    platform: "jira",
   });
   const [links, setLinks] = useState<TaskLink[]>(task.links || []);
   const { toast } = useToast();
@@ -45,34 +70,37 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
   const handleAddLink = async () => {
     if (!linkFormData.externalId) {
       toast({
-        title: 'Error',
-        description: 'External ID is required',
-        variant: 'destructive',
+        title: "Error",
+        description: "External ID is required",
+        variant: "destructive",
       });
       return;
     }
 
     try {
-      const newLink = await tasksService.addLink(task.id, linkFormData as LinkTaskDto);
+      const newLink = await tasksService.addLink(
+        task.id,
+        linkFormData as LinkTaskDto
+      );
       setLinks([...links, newLink]);
       setShowLinkForm(false);
       setLinkFormData({
         linkType: TaskLinkType.JIRA_TICKET,
-        externalId: '',
-        externalUrl: '',
-        title: '',
-        platform: 'jira',
+        externalId: "",
+        externalUrl: "",
+        title: "",
+        platform: "jira",
       });
       toast({
-        title: 'Success',
-        description: 'Link added successfully',
+        title: "Success",
+        description: "Link added successfully",
       });
       onRefresh();
     } catch (error) {
       toast({
-        title: 'Error',
-        description: 'Failed to add link',
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to add link",
+        variant: "destructive",
       });
     }
   };
@@ -83,17 +111,17 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
         linkType: link.linkType,
         externalId: link.externalId,
       });
-      setLinks(links.filter(l => l.id !== link.id));
+      setLinks(links.filter((l) => l.id !== link.id));
       toast({
-        title: 'Success',
-        description: 'Link removed successfully',
+        title: "Success",
+        description: "Link removed successfully",
       });
       onRefresh();
     } catch (error) {
       toast({
-        title: 'Error',
-        description: 'Failed to remove link',
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to remove link",
+        variant: "destructive",
       });
     }
   };
@@ -111,8 +139,8 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
   };
 
   const formatDate = (date?: string) => {
-    if (!date) return 'Not set';
-    return format(new Date(date), 'PPP');
+    if (!date) return "Not set";
+    return format(new Date(date), "PPP");
   };
 
   return (
@@ -121,12 +149,10 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
         <DialogHeader>
           <DialogTitle className="text-2xl">{task.title}</DialogTitle>
           <div className="flex gap-2 mt-2">
-            <Badge variant={task.status === 'done' ? 'default' : 'secondary'}>
-              {task.status.replace('_', ' ')}
+            <Badge variant={task.status === "done" ? "default" : "secondary"}>
+              {task.status.replace("_", " ")}
             </Badge>
-            <Badge variant="outline">
-              {task.priority}
-            </Badge>
+            <Badge variant="outline">{task.priority}</Badge>
           </div>
         </DialogHeader>
 
@@ -152,7 +178,9 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
             {task.description && (
               <div>
                 <h3 className="font-semibold mb-2">Description</h3>
-                <p className="text-gray-600 whitespace-pre-wrap">{task.description}</p>
+                <p className="text-gray-600 whitespace-pre-wrap">
+                  {task.description}
+                </p>
               </div>
             )}
 
@@ -161,25 +189,33 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-gray-500" />
                   <span className="text-sm text-gray-500">Assignee:</span>
-                  <span className="text-sm font-medium">{task.assignee || 'Unassigned'}</span>
+                  <span className="text-sm font-medium">
+                    {task.assignee || "Unassigned"}
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-gray-500" />
                   <span className="text-sm text-gray-500">Reporter:</span>
-                  <span className="text-sm font-medium">{task.reporter || 'Unknown'}</span>
+                  <span className="text-sm font-medium">
+                    {task.reporter || "Unknown"}
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-gray-500" />
                   <span className="text-sm text-gray-500">Start Date:</span>
-                  <span className="text-sm font-medium">{formatDate(task.startDate)}</span>
+                  <span className="text-sm font-medium">
+                    {formatDate(task.startDate)}
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-gray-500" />
                   <span className="text-sm text-gray-500">Due Date:</span>
-                  <span className="text-sm font-medium">{formatDate(task.dueDate)}</span>
+                  <span className="text-sm font-medium">
+                    {formatDate(task.dueDate)}
+                  </span>
                 </div>
               </div>
 
@@ -187,25 +223,33 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-gray-500" />
                   <span className="text-sm text-gray-500">Estimated:</span>
-                  <span className="text-sm font-medium">{task.estimatedHours || 0} hours</span>
+                  <span className="text-sm font-medium">
+                    {task.estimatedHours || 0} hours
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-gray-500" />
                   <span className="text-sm text-gray-500">Actual:</span>
-                  <span className="text-sm font-medium">{task.actualHours || 0} hours</span>
+                  <span className="text-sm font-medium">
+                    {task.actualHours || 0} hours
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-gray-500" />
                   <span className="text-sm text-gray-500">Created:</span>
-                  <span className="text-sm font-medium">{formatDate(task.createdAt)}</span>
+                  <span className="text-sm font-medium">
+                    {formatDate(task.createdAt)}
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-gray-500" />
                   <span className="text-sm text-gray-500">Updated:</span>
-                  <span className="text-sm font-medium">{formatDate(task.updatedAt)}</span>
+                  <span className="text-sm font-medium">
+                    {formatDate(task.updatedAt)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -253,18 +297,35 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                     <Label>Link Type</Label>
                     <Select
                       value={linkFormData.linkType}
-                      onValueChange={(value) => setLinkFormData({ ...linkFormData, linkType: value as TaskLinkType })}
+                      onValueChange={(value) =>
+                        setLinkFormData({
+                          ...linkFormData,
+                          linkType: value as TaskLinkType,
+                        })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value={TaskLinkType.JIRA_TICKET}>Jira Ticket</SelectItem>
-                        <SelectItem value={TaskLinkType.PULL_REQUEST}>Pull Request</SelectItem>
-                        <SelectItem value={TaskLinkType.MERGE_REQUEST}>Merge Request</SelectItem>
-                        <SelectItem value={TaskLinkType.ISSUE}>Issue</SelectItem>
-                        <SelectItem value={TaskLinkType.DOCUMENT}>Document</SelectItem>
-                        <SelectItem value={TaskLinkType.OTHER}>Other</SelectItem>
+                        <SelectItem value={TaskLinkType.JIRA_TICKET}>
+                          Jira Ticket
+                        </SelectItem>
+                        <SelectItem value={TaskLinkType.PULL_REQUEST}>
+                          Pull Request
+                        </SelectItem>
+                        <SelectItem value={TaskLinkType.MERGE_REQUEST}>
+                          Merge Request
+                        </SelectItem>
+                        <SelectItem value={TaskLinkType.ISSUE}>
+                          Issue
+                        </SelectItem>
+                        <SelectItem value={TaskLinkType.DOCUMENT}>
+                          Document
+                        </SelectItem>
+                        <SelectItem value={TaskLinkType.OTHER}>
+                          Other
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -274,7 +335,12 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                     <Input
                       placeholder="e.g., JIRA-123, PR#456"
                       value={linkFormData.externalId}
-                      onChange={(e) => setLinkFormData({ ...linkFormData, externalId: e.target.value })}
+                      onChange={(e) =>
+                        setLinkFormData({
+                          ...linkFormData,
+                          externalId: e.target.value,
+                        })
+                      }
                     />
                   </div>
 
@@ -283,7 +349,12 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                     <Input
                       placeholder="Link title"
                       value={linkFormData.title}
-                      onChange={(e) => setLinkFormData({ ...linkFormData, title: e.target.value })}
+                      onChange={(e) =>
+                        setLinkFormData({
+                          ...linkFormData,
+                          title: e.target.value,
+                        })
+                      }
                     />
                   </div>
 
@@ -292,7 +363,12 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                     <Input
                       placeholder="https://..."
                       value={linkFormData.externalUrl}
-                      onChange={(e) => setLinkFormData({ ...linkFormData, externalUrl: e.target.value })}
+                      onChange={(e) =>
+                        setLinkFormData({
+                          ...linkFormData,
+                          externalUrl: e.target.value,
+                        })
+                      }
                     />
                   </div>
 
@@ -301,7 +377,12 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                     <Input
                       placeholder="jira, github, gitlab, etc."
                       value={linkFormData.platform}
-                      onChange={(e) => setLinkFormData({ ...linkFormData, platform: e.target.value })}
+                      onChange={(e) =>
+                        setLinkFormData({
+                          ...linkFormData,
+                          platform: e.target.value,
+                        })
+                      }
                     />
                   </div>
                 </div>
@@ -310,7 +391,11 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                   <Button size="sm" onClick={handleAddLink}>
                     Add Link
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => setShowLinkForm(false)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowLinkForm(false)}
+                  >
                     Cancel
                   </Button>
                 </div>
@@ -319,7 +404,10 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
 
             <div className="space-y-2">
               {links.map((link) => (
-                <div key={link.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                <div
+                  key={link.id}
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
+                >
                   <div className="flex items-center gap-3">
                     {getLinkIcon(link.linkType)}
                     <div>
@@ -327,7 +415,7 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                         {link.title || link.externalId}
                       </div>
                       <div className="text-sm text-gray-500">
-                        {link.platform} • {link.linkType.replace('_', ' ')}
+                        {link.platform} • {link.linkType.replace("_", " ")}
                         {link.status && ` • ${link.status}`}
                       </div>
                     </div>
@@ -337,7 +425,7 @@ const TaskDetails: React.FC<TaskDetailsProps> = ({
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => window.open(link.externalUrl, '_blank')}
+                        onClick={() => window.open(link.externalUrl, "_blank")}
                       >
                         <ExternalLink className="h-4 w-4" />
                       </Button>
