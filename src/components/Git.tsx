@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
   GitBranch,
   GitCommit,
@@ -15,11 +15,11 @@ import {
   Star,
   GitFork,
   Lock,
-  Unlock
-} from 'lucide-react';
-import gitService from '../services/git.service';
-import { GitRepository, GitProvider } from '../types/git.types';
-import { useProjectContext } from '../context/ProjectContext';
+  Unlock,
+} from "lucide-react";
+import gitService from "../services/git.service";
+import { GitRepository, GitProvider } from "../types/git.types";
+import { useProjectContext } from "../context/ProjectContext";
 
 const Git = () => {
   const [repositories, setRepositories] = useState<GitRepository[]>([]);
@@ -49,7 +49,7 @@ const Git = () => {
       const repos = await gitService.getRepositories(selectedProject.id);
       setRepositories(repos);
     } catch (err: any) {
-      setError(err.message || 'Failed to load repositories');
+      setError(err.message || "Failed to load repositories");
     } finally {
       setLoading(false);
     }
@@ -57,35 +57,45 @@ const Git = () => {
 
   const syncRepositories = async () => {
     if (!selectedProject?.id) {
-      setError('Please select a project first');
+      setError("Please select a project first");
       return;
     }
 
-    console.log('[Git Component] Starting sync for project:', selectedProject.id, selectedProject.name);
+    console.log(
+      "[Git Component] Starting sync for project:",
+      selectedProject.id,
+      selectedProject.name
+    );
     setSyncing(true);
     setError(null);
     setSyncResult(null);
 
     try {
-      const result = await gitService.syncProjectRepositories(selectedProject.id);
-      console.log('[Git Component] Sync result:', result);
+      const result = await gitService.syncProjectRepositories(
+        selectedProject.id
+      );
+      console.log("[Git Component] Sync result:", result);
 
       setRepositories(result.repositories);
       setSyncResult({
         credentialsUsed: result.credentialsUsed,
         errors: result.errors,
-        syncedAt: result.syncedAt
+        syncedAt: result.syncedAt,
       });
 
       if (result.errors.length > 0) {
-        console.warn('[Git Component] Sync had errors:', result.errors);
+        console.warn("[Git Component] Sync had errors:", result.errors);
         setError(`Sync completed with ${result.errors.length} error(s)`);
       } else {
-        console.log('[Git Component] Sync completed successfully');
+        console.log("[Git Component] Sync completed successfully");
       }
     } catch (err: any) {
-      console.error('[Git Component] Sync failed:', err);
-      setError(err.response?.data?.message || err.message || 'Failed to sync repositories');
+      console.error("[Git Component] Sync failed:", err);
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Failed to sync repositories"
+      );
     } finally {
       setSyncing(false);
     }
@@ -93,9 +103,9 @@ const Git = () => {
 
   const getProviderIcon = (provider: GitProvider) => {
     switch (provider) {
-      case 'github':
+      case "github":
         return <Github className="w-5 h-5" />;
-      case 'gitlab':
+      case "gitlab":
         return <Gitlab className="w-5 h-5" />;
       default:
         return <Server className="w-5 h-5" />;
@@ -104,9 +114,9 @@ const Git = () => {
 
   const getVisibilityIcon = (visibility: string) => {
     switch (visibility) {
-      case 'private':
+      case "private":
         return <Lock className="w-4 h-4 text-gray-500" />;
-      case 'public':
+      case "public":
         return <Unlock className="w-4 h-4 text-green-600" />;
       default:
         return null;
@@ -114,7 +124,7 @@ const Git = () => {
   };
 
   const formatDate = (date: string | Date | undefined) => {
-    if (!date) return 'Never';
+    if (!date) return "Never";
     const d = new Date(date);
     const now = new Date();
     const diff = now.getTime() - d.getTime();
@@ -122,10 +132,10 @@ const Git = () => {
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const minutes = Math.floor(diff / (1000 * 60));
 
-    if (days > 0) return `${days} day${days === 1 ? '' : 's'} ago`;
-    if (hours > 0) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-    if (minutes > 0) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
-    return 'Just now';
+    if (days > 0) return `${days} day${days === 1 ? "" : "s"} ago`;
+    if (hours > 0) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+    if (minutes > 0) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+    return "Just now";
   };
 
   return (
@@ -133,11 +143,13 @@ const Git = () => {
       <div className="mb-8">
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Git Repositories</h1>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Git Repositories
+            </h1>
             <p className="text-gray-600 mt-2">
               {selectedProject
                 ? `Repositories for ${selectedProject.name}`
-                : 'Select a project to view repositories'}
+                : "Select a project to view repositories"}
             </p>
           </div>
           <button
@@ -145,8 +157,8 @@ const Git = () => {
             disabled={!selectedProject || syncing}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
           >
-            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? 'Syncing...' : 'Sync Repositories'}
+            <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Syncing..." : "Sync Repositories"}
           </button>
         </div>
       </div>
@@ -171,7 +183,9 @@ const Git = () => {
             <p>Credentials used: {syncResult.credentialsUsed.length}</p>
             {syncResult.errors.length > 0 && (
               <div className="mt-2 pt-2 border-t border-green-200">
-                <p className="font-medium text-yellow-700">Some credentials had issues:</p>
+                <p className="font-medium text-yellow-700">
+                  Some credentials had issues:
+                </p>
                 {syncResult.errors.map((err, idx) => (
                   <p key={idx} className="text-yellow-600 ml-2 text-xs mt-1">
                     • {err.credential}: {err.error}
@@ -188,7 +202,9 @@ const Git = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Total Repositories</p>
-              <p className="text-2xl font-bold text-gray-900">{repositories.length}</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {repositories.length}
+              </p>
             </div>
             <GitBranch className="w-8 h-8 text-gray-400" />
           </div>
@@ -198,7 +214,7 @@ const Git = () => {
             <div>
               <p className="text-sm text-gray-600">GitHub Repos</p>
               <p className="text-2xl font-bold text-gray-900">
-                {repositories.filter(r => r.provider === 'github').length}
+                {repositories.filter((r) => r.provider === "github").length}
               </p>
             </div>
             <Github className="w-8 h-8 text-gray-900" />
@@ -209,7 +225,7 @@ const Git = () => {
             <div>
               <p className="text-sm text-gray-600">GitLab Repos</p>
               <p className="text-2xl font-bold text-orange-600">
-                {repositories.filter(r => r.provider === 'gitlab').length}
+                {repositories.filter((r) => r.provider === "gitlab").length}
               </p>
             </div>
             <Gitlab className="w-8 h-8 text-orange-600" />
@@ -233,7 +249,7 @@ const Git = () => {
             <p className="mt-2 text-gray-600">
               {selectedProject
                 ? 'No repositories found. Click "Sync Repositories" to fetch from your Git providers.'
-                : 'Select a project to view its repositories'}
+                : "Select a project to view its repositories"}
             </p>
             {selectedProject && (
               <div className="mt-4 text-sm text-gray-500">
@@ -249,13 +265,18 @@ const Git = () => {
         ) : (
           <div className="divide-y">
             {repositories.map((repo) => (
-              <div key={repo.id} className="p-6 hover:bg-gray-50 transition-colors">
+              <div
+                key={repo.id}
+                className="p-6 hover:bg-gray-50 transition-colors"
+              >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="flex items-center gap-2">
                         {getProviderIcon(repo.provider)}
-                        <h3 className="text-lg font-semibold text-gray-900">{repo.name}</h3>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {repo.name}
+                        </h3>
                       </div>
                       {getVisibilityIcon(repo.visibility)}
                       {repo.credentialId && (
@@ -267,13 +288,17 @@ const Git = () => {
                     </div>
 
                     {repo.description && (
-                      <p className="text-sm text-gray-600 mb-2">{repo.description}</p>
+                      <p className="text-sm text-gray-600 mb-2">
+                        {repo.description}
+                      </p>
                     )}
 
                     <div className="flex items-center gap-4 text-sm text-gray-600">
                       <div className="flex items-center gap-1">
                         <GitBranch className="w-4 h-4" />
-                        <span className="font-medium">{repo.defaultBranch || 'main'}</span>
+                        <span className="font-medium">
+                          {repo.defaultBranch || "main"}
+                        </span>
                       </div>
 
                       {repo.metadata?.stars !== undefined && (

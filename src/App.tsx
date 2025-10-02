@@ -3,7 +3,8 @@ import { ProjectProvider } from './context/ProjectContext';
 import DashboardLayout from './components/DashboardLayout';
 import Projects from './components/Projects';
 import JiraComprehensive from './components/JiraComprehensive';
-import GitManagement from './components/GitManagement';
+import GitManagementImproved from './components/GitManagementImproved';
+import CredentialsManagement from './pages/CredentialsManagement';
 import Tasks from './pages/Tasks';
 import { CronsPage } from './pages/CronsPage';
 import { CronDetailsPage } from './pages/CronDetailsPage';
@@ -16,11 +17,12 @@ function App() {
           <Route path="/" element={<DashboardLayout />}>
             <Route index element={<Navigate to="/projects" replace />} />
             <Route path="projects" element={<Projects />} />
+            <Route path="credentials" element={<CredentialsManagement />} />
             <Route path="tasks" element={<Tasks />} />
             <Route path="crons" element={<CronsPage />} />
             <Route path="crons/:id" element={<CronDetailsPage />} />
             <Route path="jira" element={<JiraComprehensive />} />
-            <Route path="git" element={<GitManagement />} />
+            <Route path="git" element={<GitManagementImproved />} />
           </Route>
         </Routes>
       </BrowserRouter>

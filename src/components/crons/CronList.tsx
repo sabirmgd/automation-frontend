@@ -57,6 +57,7 @@ export const CronList: React.FC<CronListProps> = ({
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
+            <TableHead>Type</TableHead>
             <TableHead>Expression</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Last Run</TableHead>
@@ -77,6 +78,11 @@ export const CronList: React.FC<CronListProps> = ({
                     </div>
                   )}
                 </div>
+              </TableCell>
+              <TableCell>
+                <Badge variant="outline">
+                  {cronJob.jobType?.replace('_', ' ').toUpperCase() || 'GENERIC'}
+                </Badge>
               </TableCell>
               <TableCell>
                 <code className="text-xs bg-muted px-1 py-0.5 rounded">

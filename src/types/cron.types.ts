@@ -1,21 +1,52 @@
-export enum CronJobStatus {
-  ACTIVE = 'active',
-  INACTIVE = 'inactive',
-  RUNNING = 'running',
-  ERROR = 'error',
-}
+export const CronJobStatus = {
+  ACTIVE: 'active',
+  INACTIVE: 'inactive',
+  RUNNING: 'running',
+  ERROR: 'error',
+} as const;
+export type CronJobStatus = typeof CronJobStatus[keyof typeof CronJobStatus];
 
-export enum ExecutionStatus {
-  SUCCESS = 'success',
-  FAILURE = 'failure',
-  RUNNING = 'running',
-}
+export const ExecutionStatus = {
+  SUCCESS: 'success',
+  FAILURE: 'failure',
+  RUNNING: 'running',
+} as const;
+export type ExecutionStatus = typeof ExecutionStatus[keyof typeof ExecutionStatus];
+
+export const CronJobType = {
+  GENERIC: 'generic',
+  JIRA_SYNC: 'jira_sync',
+  DATABASE_BACKUP: 'database_backup',
+  GIT_SYNC: 'git_sync',
+  REPORT_GENERATION: 'report_generation',
+  DATA_CLEANUP: 'data_cleanup',
+  HEALTH_CHECK: 'health_check',
+} as const;
+export type CronJobType = typeof CronJobType[keyof typeof CronJobType];
+
+export const JiraSyncMode = {
+  SINGLE_BOARD: 'single_board',
+  ALL_BOARDS: 'all_boards',
+  CUSTOM_JQL: 'custom_jql',
+  BY_ACCOUNT: 'by_account',
+} as const;
+export type JiraSyncMode = typeof JiraSyncMode[keyof typeof JiraSyncMode];
+
+export const JiraSyncOption = {
+  CLEAR_EXISTING: 'clear_existing',
+  SYNC_COMMENTS: 'sync_comments',
+  SYNC_ATTACHMENTS: 'sync_attachments',
+  SYNC_WATCHERS: 'sync_watchers',
+  SYNC_WORK_LOGS: 'sync_work_logs',
+} as const;
+export type JiraSyncOption = typeof JiraSyncOption[keyof typeof JiraSyncOption];
 
 export interface CronJob {
   id: string;
   name: string;
   description?: string;
   cronExpression: string;
+  jobType: CronJobType;
   status: CronJobStatus;
   isActive: boolean;
   lastRun?: Date | string;
@@ -51,6 +82,7 @@ export interface CreateCronDto {
   name: string;
   description?: string;
   cronExpression: string;
+  jobType?: CronJobType;
   isActive?: boolean;
   projectId?: string;
   metadata?: Record<string, any>;
@@ -60,6 +92,7 @@ export interface UpdateCronDto {
   name?: string;
   description?: string;
   cronExpression?: string;
+  jobType?: CronJobType;
   isActive?: boolean;
   projectId?: string;
   metadata?: Record<string, any>;

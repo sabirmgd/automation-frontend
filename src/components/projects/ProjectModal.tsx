@@ -1,4 +1,5 @@
 import { X, Folder } from 'lucide-react';
+// @ts-ignore
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';

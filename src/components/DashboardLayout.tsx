@@ -8,7 +8,8 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
-  Menu
+  Menu,
+  Key
 } from 'lucide-react';
 import ProjectSelector from './ProjectSelector';
 
@@ -27,6 +28,11 @@ const DashboardLayout = () => {
       name: 'Projects',
       icon: <FolderOpen className="w-5 h-5" />,
       path: '/projects'
+    },
+    {
+      name: 'Credentials',
+      icon: <Key className="w-5 h-5" />,
+      path: '/credentials'
     },
     {
       name: 'Tasks',

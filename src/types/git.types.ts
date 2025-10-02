@@ -173,6 +173,9 @@ export interface GitPullRequest {
   additions: number;
   deletions: number;
   changedFiles: number;
+  repository?: GitRepository;
+  url?: string;
+  authorUsername?: string;
 }
 
 // Branch Types

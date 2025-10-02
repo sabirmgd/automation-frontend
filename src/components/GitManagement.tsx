@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   GitBranch,
   GitCommit,
-  GitMerge,
   GitPullRequest,
   Clock,
   Check,
@@ -19,17 +18,20 @@ import {
   Server,
   Edit,
   Flame,
+  Activity,
 } from 'lucide-react';
 import { useGitCredentials, useGitRepositories, useGitPullRequests } from '../hooks/useGit';
 import { GitProvider, CredentialType, type GitRepository } from '../types/git.types';
+import PullRequestList from './pullRequests/PullRequestList';
 import CredentialModal from './modals/CredentialModal';
 import RepositoryModal from './modals/RepositoryModal';
 import EditRepositoryModal from './modals/EditRepositoryModal';
 import { useProjectContext } from '../context/ProjectContext';
+import { PipelineAnalysisDashboard } from './pipelines/PipelineAnalysisDashboard';
 
 const GitManagement = ({ projectId }: { projectId?: string }) => {
   const { selectedProject } = useProjectContext();
-  const [activeTab, setActiveTab] = useState<'repositories' | 'credentials' | 'pullrequests'>('repositories');
+  const [activeTab, setActiveTab] = useState<'repositories' | 'credentials' | 'pullrequests' | 'pipelines'>('repositories');
   const [selectedProvider, setSelectedProvider] = useState<GitProvider | undefined>(undefined);
   const [selectedRepo, setSelectedRepo] = useState<GitRepository | null>(null);
   const [showCredentialModal, setShowCredentialModal] = useState(false);
@@ -69,8 +71,17 @@ const GitManagement = ({ projectId }: { projectId?: string }) => {
     pullRequests,
     loading: prLoading,
     // createPullRequest, // Will be used when modal is implemented
-    mergePullRequest,
+    // mergePullRequest, // Not needed with PullRequestList component
   } = useGitPullRequests(selectedRepo?.id || '');
+
+  // Auto-select first repository when repositories are loaded
+  useEffect(() => {
+    if (repositories && repositories.length > 0 && !selectedRepo) {
+      // Try to find ossBackend first, otherwise select the first repo
+      const ossBackend = repositories.find(r => r.name?.includes('ossBackend'));
+      setSelectedRepo(ossBackend || repositories[0]);
+    }
+  }, [repositories]);
 
   const getProviderIcon = (provider: string) => {
     switch (provider.toLowerCase()) {
@@ -116,18 +127,6 @@ const GitManagement = ({ projectId }: { projectId?: string }) => {
     }
   };
 
-  const getPRStatusBadge = (status: string) => {
-    switch (status) {
-      case 'open':
-        return <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">Open</span>;
-      case 'merged':
-        return <span className="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded">Merged</span>;
-      case 'closed':
-        return <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded">Closed</span>;
-      default:
-        return null;
-    }
-  };
 
   // Filter and sort repositories
   const filteredAndSortedRepositories = useMemo(() => {
@@ -294,6 +293,17 @@ const GitManagement = ({ projectId }: { projectId?: string }) => {
             }`}
           >
             Pull Requests
+          </button>
+          <button
+            onClick={() => setActiveTab('pipelines')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2 ${
+              activeTab === 'pipelines'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <Activity className="w-4 h-4" />
+            Pipelines
           </button>
         </nav>
       </div>
@@ -562,13 +572,12 @@ const GitManagement = ({ projectId }: { projectId?: string }) => {
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-900">Pull Requests</h2>
-            <button
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-              disabled={!selectedRepo}
-            >
-              <Plus className="w-4 h-4" />
-              New Pull Request
-            </button>
+            {selectedRepo && (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                {getProviderIcon(selectedRepo.provider)}
+                <span className="font-medium">{selectedRepo.name}</span>
+              </div>
+            )}
           </div>
 
           {!selectedRepo ? (
@@ -579,62 +588,50 @@ const GitManagement = ({ projectId }: { projectId?: string }) => {
             </div>
           ) : (
             <div className="bg-white rounded-lg shadow">
-              <div className="p-4 border-b">
-                <div className="flex items-center gap-2">
-                  {getProviderIcon(selectedRepo.provider)}
-                  <span className="font-medium">{selectedRepo.name}</span>
-                </div>
-              </div>
-              <div className="divide-y">
-                {prLoading ? (
-                  <div className="p-6 text-center text-gray-500">Loading pull requests...</div>
-                ) : pullRequests.length === 0 ? (
-                  <div className="p-6 text-center text-gray-500">No pull requests found</div>
-                ) : (
-                  pullRequests.map((pr) => (
-                    <div key={pr.id} className="p-6 hover:bg-gray-50 transition-colors">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-start gap-3">
-                            <GitMerge className="w-5 h-5 text-gray-400 mt-0.5" />
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-1">
-                                <h3 className="text-base font-semibold text-gray-900">
-                                  {pr.title} <span className="text-gray-500 font-normal">#{pr.number}</span>
-                                </h3>
-                                {getPRStatusBadge(pr.state)}
-                              </div>
-                              <p className="text-sm text-gray-600 mb-2">
-                                {pr.sourceBranch} → {pr.targetBranch} •
-                                opened {new Date(pr.createdAt).toLocaleDateString()} by {pr.author.username}
-                              </p>
-                              <div className="flex items-center gap-4 text-sm text-gray-500">
-                                <span>{pr.commits} commits</span>
-                                <span>{pr.comments} comments</span>
-                                <span className="text-green-600">+{pr.additions}</span>
-                                <span className="text-red-600">-{pr.deletions}</span>
-                                <span>{pr.changedFiles} files</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        {pr.state === 'open' && (
-                          <button
-                            onClick={() => mergePullRequest(pr.number)}
-                            className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                          >
-                            Merge
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+              <PullRequestList
+                pullRequests={pullRequests}
+                loading={prLoading}
+                error={null}
+                onPullRequestClick={(pr) => {
+                  // Open PR in new tab if URL is available
+                  if (pr.url) {
+                    window.open(pr.url, '_blank');
+                  }
+                }}
+              />
             </div>
           )}
         </div>
       )}
+
+      {activeTab === 'pipelines' && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold text-gray-900">Pipeline Analysis</h2>
+            {selectedRepo && (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                {getProviderIcon(selectedRepo.provider)}
+                <span className="font-medium">{selectedRepo.name}</span>
+              </div>
+            )}
+          </div>
+
+          {!selectedRepo ? (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <p className="text-sm text-yellow-800">
+                Please select a repository from the Repositories tab to view pipeline analysis.
+              </p>
+            </div>
+          ) : (
+            <PipelineAnalysisDashboard
+              repositoryId={selectedRepo.id}
+              projectId={selectedRepo.remoteId || `${selectedRepo.namespace}/${selectedRepo.name}`}
+              platform={selectedRepo.provider.toLowerCase() as 'github' | 'gitlab'}
+            />
+          )}
+        </div>
+      )}
+
 
       {/* Modals */}
       <CredentialModal
