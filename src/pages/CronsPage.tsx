@@ -42,9 +42,18 @@ export const CronsPage: React.FC = () => {
   const loadProjects = async () => {
     try {
       const data = await projectsService.getProjects();
-      setProjects(data.projects.map((p: any) => ({ id: p.id, name: p.name })));
+      if (data?.projects && Array.isArray(data.projects)) {
+        setProjects(data.projects.map((p: any) => ({ id: p.id, name: p.name })));
+      } else if (Array.isArray(data)) {
+        // Handle case where data is directly an array
+        setProjects(data.map((p: any) => ({ id: p.id, name: p.name })));
+      } else {
+        console.warn('Unexpected projects data structure:', data);
+        setProjects([]);
+      }
     } catch (error) {
       console.error('Failed to load projects:', error);
+      setProjects([]);
     }
   };
 

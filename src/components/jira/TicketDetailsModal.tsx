@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   X, User, Calendar, Tag, AlertCircle, Paperclip, MessageCircle,
-  Clock, ChevronDown, ChevronUp, Edit2, Save, XCircle, Plus
+  Clock, ChevronDown, ChevronUp, Edit2, Save, XCircle, Plus, Lock, RefreshCw
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
@@ -13,6 +13,10 @@ import { Textarea } from '../ui/textarea';
 import jiraService from '../../services/jiraService';
 import AttachmentCard from './AttachmentCard';
 import ImagePreviewModal from './ImagePreviewModal';
+import CommentTabs from './CommentTabs';
+import HiddenCommentsList from './HiddenCommentsList';
+import HiddenCommentInput from './HiddenCommentInput';
+import type { HiddenComment, CreateHiddenCommentDto } from '../../types/jira.types';
 
 interface TicketDetailsModalProps {
   open: boolean;
@@ -90,10 +94,16 @@ const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({
   const [newComment, setNewComment] = useState('');
   const [isAddingComment, setIsAddingComment] = useState(false);
   const [showCommentInput, setShowCommentInput] = useState(false);
+  const [hiddenComments, setHiddenComments] = useState<HiddenComment[]>([]);
+  const [isLoadingHidden, setIsLoadingHidden] = useState(false);
+  const [activeCommentTab, setActiveCommentTab] = useState<string>('jira');
+  const [showHiddenCommentInput, setShowHiddenCommentInput] = useState(false);
+  const [isImproving, setIsImproving] = useState(false);
 
   useEffect(() => {
     if (open && ticketId) {
       fetchTicketDetails();
+      fetchHiddenComments();
     }
   }, [open, ticketId]);
 
@@ -111,6 +121,20 @@ const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({
       setError('Failed to load ticket details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchHiddenComments = async () => {
+    if (!ticketId) return;
+
+    setIsLoadingHidden(true);
+    try {
+      const comments = await jiraService.getHiddenComments(ticketId);
+      setHiddenComments(comments);
+    } catch (error) {
+      console.error('Failed to fetch hidden comments:', error);
+    } finally {
+      setIsLoadingHidden(false);
     }
   };
 
@@ -136,6 +160,36 @@ const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({
   const handleCancelEdit = () => {
     setEditedDescription(ticketDetails?.description || '');
     setIsEditingDescription(false);
+  };
+
+  const handleImproveDescription = async () => {
+    const currentDescription = isEditingDescription ? editedDescription : (ticketDetails?.description || '');
+
+    if (!currentDescription.trim()) {
+      setError('No description to improve');
+      return;
+    }
+
+    setIsImproving(true);
+    try {
+      const improved = await jiraService.improveTicketDescription(
+        currentDescription,
+        `Ticket: ${ticketDetails?.key} - ${ticketDetails?.summary}`
+      );
+
+      // Use the improved description
+      setEditedDescription(improved.description);
+
+      // If not in edit mode, automatically enter edit mode to show the improved version
+      if (!isEditingDescription) {
+        setIsEditingDescription(true);
+      }
+    } catch (error) {
+      console.error('Failed to improve description:', error);
+      setError('Failed to improve description');
+    } finally {
+      setIsImproving(false);
+    }
   };
 
   const toggleComment = (commentId: string) => {
@@ -165,6 +219,41 @@ const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({
       setError('Failed to add comment');
     } finally {
       setIsAddingComment(false);
+    }
+  };
+
+  const handleAddHiddenComment = async (dto: CreateHiddenCommentDto) => {
+    if (!ticketId) return;
+
+    try {
+      const newHiddenComment = await jiraService.createHiddenComment(ticketId, dto);
+      setHiddenComments(prev => [newHiddenComment, ...prev]);
+      setShowHiddenCommentInput(false);
+    } catch (error) {
+      console.error('Failed to add hidden comment:', error);
+      setError('Failed to add internal note');
+    }
+  };
+
+  const handleUpdateHiddenComment = async (commentId: string, content: string) => {
+    try {
+      const updated = await jiraService.updateHiddenComment(commentId, { content });
+      setHiddenComments(prev =>
+        prev.map(comment => comment.id === commentId ? updated : comment)
+      );
+    } catch (error) {
+      console.error('Failed to update hidden comment:', error);
+      setError('Failed to update internal note');
+    }
+  };
+
+  const handleDeleteHiddenComment = async (commentId: string) => {
+    try {
+      await jiraService.deleteHiddenComment(commentId);
+      setHiddenComments(prev => prev.filter(comment => comment.id !== commentId));
+    } catch (error) {
+      console.error('Failed to delete hidden comment:', error);
+      setError('Failed to delete internal note');
     }
   };
 
@@ -410,16 +499,37 @@ const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-semibold">Description</h3>
-                    {!isEditingDescription && (
+                    <div className="flex gap-2">
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setIsEditingDescription(true)}
+                        onClick={handleImproveDescription}
+                        disabled={isImproving || isSaving}
+                        title="Improve description with AI"
                       >
-                        <Edit2 className="w-4 h-4 mr-1" />
-                        Edit
+                        {isImproving ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                            Improving...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="w-4 h-4 mr-1" />
+                            Improve
+                          </>
+                        )}
                       </Button>
-                    )}
+                      {!isEditingDescription && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setIsEditingDescription(true)}
+                        >
+                          <Edit2 className="w-4 h-4 mr-1" />
+                          Edit
+                        </Button>
+                      )}
+                    </div>
                   </div>
                   {renderDescription(ticketDetails.description, ticketDetails.renderedDescription)}
                 </div>
@@ -451,93 +561,137 @@ const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({
                 )}
 
                 {/* Comments Section */}
-                {ticketDetails.comments.length > 0 && (
-                  <>
-                    <Separator />
-                    <div>
+                <Separator />
+                <div>
                       <div className="flex items-center justify-between mb-3">
                       <h3 className="font-semibold flex items-center gap-2">
                         <MessageCircle className="w-4 h-4" />
-                        Comments ({ticketDetails.comments?.length || 0})
+                        Comments
                       </h3>
-                      {!showCommentInput && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setShowCommentInput(true)}
-                        >
-                          <Plus className="w-4 h-4 mr-1" />
-                          Add Comment
-                        </Button>
-                      )}
-                    </div>
-
-                    {/* Add Comment Input */}
-                    {showCommentInput && (
-                      <div className="mb-4 p-4 border rounded-lg bg-gray-50">
-                        <Textarea
-                          value={newComment}
-                          onChange={(e) => setNewComment(e.target.value)}
-                          placeholder="Write a comment..."
-                          className="mb-3 min-h-[100px]"
-                          disabled={isAddingComment}
-                        />
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={handleAddComment}
-                            disabled={!newComment.trim() || isAddingComment}
-                          >
-                            {isAddingComment ? (
-                              <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                                Adding...
-                              </>
-                            ) : (
-                              <>
-                                <MessageCircle className="w-4 h-4 mr-2" />
-                                Add Comment
-                              </>
-                            )}
-                          </Button>
+                      <div className="flex gap-2">
+                        {activeCommentTab === 'jira' && !showCommentInput && (
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => {
-                              setShowCommentInput(false);
-                              setNewComment('');
-                            }}
-                            disabled={isAddingComment}
+                            onClick={() => setShowCommentInput(true)}
                           >
-                            Cancel
+                            <Plus className="w-4 h-4 mr-1" />
+                            Add Comment
                           </Button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Comments List */}
-                    {ticketDetails.comments && ticketDetails.comments.length > 0 ? (
-                      <div className="space-y-3">
-                        {(showAllComments ? ticketDetails.comments : ticketDetails.comments.slice(0, 5))
-                          .map(renderComment)}
-                        {ticketDetails.comments.length > 5 && !showAllComments && (
+                        )}
+                        {activeCommentTab === 'hidden' && !showHiddenCommentInput && (
                           <Button
+                            size="sm"
                             variant="outline"
-                            className="w-full"
-                            onClick={() => setShowAllComments(true)}
+                            onClick={() => setShowHiddenCommentInput(true)}
                           >
-                            Show all {ticketDetails.comments.length} comments
+                            <Plus className="w-4 h-4 mr-1" />
+                            Add Note
                           </Button>
                         )}
                       </div>
-                    ) : (
-                      <p className="text-sm text-gray-500 text-center py-4">
-                        No comments yet. Be the first to comment!
-                      </p>
-                    )}
                     </div>
-                  </>
-                )}
+
+                    {/* Tabbed Comments Interface */}
+                    <CommentTabs
+                      jiraCommentCount={ticketDetails.comments?.length || 0}
+                      hiddenCommentCount={hiddenComments.length}
+                      activeTab={activeCommentTab}
+                      onTabChange={setActiveCommentTab}
+                    >
+                      {{
+                        jiraContent: (
+                          <>
+                            {/* Jira Comment Input */}
+                            {showCommentInput && (
+                              <div className="mb-4 p-4 border rounded-lg bg-gray-50">
+                                <Textarea
+                                  value={newComment}
+                                  onChange={(e) => setNewComment(e.target.value)}
+                                  placeholder="Write a comment..."
+                                  className="mb-3 min-h-[100px]"
+                                  disabled={isAddingComment}
+                                />
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    onClick={handleAddComment}
+                                    disabled={!newComment.trim() || isAddingComment}
+                                  >
+                                    {isAddingComment ? (
+                                      <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                                        Adding...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <MessageCircle className="w-4 h-4 mr-2" />
+                                        Add Comment
+                                      </>
+                                    )}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setShowCommentInput(false);
+                                      setNewComment('');
+                                    }}
+                                    disabled={isAddingComment}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Jira Comments List */}
+                            {ticketDetails.comments && ticketDetails.comments.length > 0 ? (
+                              <div className="space-y-3">
+                                {(showAllComments ? ticketDetails.comments : ticketDetails.comments.slice(0, 5))
+                                  .map(renderComment)}
+                                {ticketDetails.comments.length > 5 && !showAllComments && (
+                                  <Button
+                                    variant="outline"
+                                    className="w-full"
+                                    onClick={() => setShowAllComments(true)}
+                                  >
+                                    Show all {ticketDetails.comments.length} comments
+                                  </Button>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-gray-500 text-center py-4">
+                                No comments yet. Be the first to comment!
+                              </p>
+                            )}
+                          </>
+                        ),
+                        hiddenContent: (
+                          <>
+                            {/* Hidden Comment Input */}
+                            {showHiddenCommentInput && (
+                              <HiddenCommentInput
+                                onSubmit={handleAddHiddenComment}
+                                onCancel={() => setShowHiddenCommentInput(false)}
+                                isSubmitting={false}
+                              />
+                            )}
+
+                            {/* Hidden Comments List */}
+                            {!showHiddenCommentInput && (
+                              <HiddenCommentsList
+                                comments={hiddenComments}
+                                onUpdateComment={handleUpdateHiddenComment}
+                                onDeleteComment={handleDeleteHiddenComment}
+                                isLoading={isLoadingHidden}
+                              />
+                            )}
+                          </>
+                        )
+                      }}
+                    </CommentTabs>
+                    </div>
 
                 {/* Timestamps */}
                 <Separator />

@@ -14,6 +14,7 @@ export interface Project {
   jiraKey?: string;
   gitlabUrl?: string;
   jiraUrl?: string;
+  agentNavigationInfo?: string;
 }
 
 export interface CreateProjectDto {
@@ -29,6 +30,7 @@ export interface CreateProjectDto {
   jiraKey?: string;
   gitlabUrl?: string;
   jiraUrl?: string;
+  agentNavigationInfo?: string;
 }
 
 export interface UpdateProjectDto {
@@ -44,6 +46,7 @@ export interface UpdateProjectDto {
   jiraKey?: string;
   gitlabUrl?: string;
   jiraUrl?: string;
+  agentNavigationInfo?: string;
 }
 
 export interface ProjectsResponse {

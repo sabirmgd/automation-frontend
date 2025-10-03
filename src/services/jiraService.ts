@@ -6,7 +6,10 @@ import type {
   JiraProject,
   CreateJiraAccountDto,
   UpdateJiraAccountDto,
-  PullRequest
+  PullRequest,
+  HiddenComment,
+  CreateHiddenCommentDto,
+  UpdateHiddenCommentDto
 } from '../types/jira.types';
 import type { AxiosResponse } from 'axios';
 
@@ -140,9 +143,44 @@ class JiraService {
     await apiClient.patch(`/jira/tickets/${ticketId}/description`, { description });
   }
 
+  async improveTicketDescription(description: string, context?: string): Promise<{
+    title: string;
+    description: string;
+    acceptanceCriteria: Array<{ criteria: string; testable: boolean }>;
+    technicalDetails?: string;
+    scope: string;
+    priority: string;
+  }> {
+    const { data } = await apiClient.post('/jira/tickets/improve',
+      { description, context },
+      { timeout: 180000 } // 3 minutes timeout for AI processing
+    );
+    return data;
+  }
+
   async addTicketComment(ticketId: string, comment: string): Promise<any> {
     const { data } = await apiClient.post(`/jira/tickets/${ticketId}/comments`, { comment });
     return data;
+  }
+
+  // Hidden Comments
+  async getHiddenComments(ticketId: string): Promise<HiddenComment[]> {
+    const { data } = await apiClient.get<HiddenComment[]>(`/api/jira/tickets/${ticketId}/hidden-comments`);
+    return data;
+  }
+
+  async createHiddenComment(ticketId: string, dto: CreateHiddenCommentDto): Promise<HiddenComment> {
+    const { data } = await apiClient.post<HiddenComment>(`/api/jira/tickets/${ticketId}/hidden-comments`, dto);
+    return data;
+  }
+
+  async updateHiddenComment(commentId: string, dto: UpdateHiddenCommentDto): Promise<HiddenComment> {
+    const { data } = await apiClient.put<HiddenComment>(`/api/jira/hidden-comments/${commentId}`, dto);
+    return data;
+  }
+
+  async deleteHiddenComment(commentId: string): Promise<void> {
+    await apiClient.delete(`/api/jira/hidden-comments/${commentId}`);
   }
 }
 

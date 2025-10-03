@@ -1,6 +1,6 @@
 export const API_CONFIG = {
   BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:3000',
-  TIMEOUT: 30000,
+  TIMEOUT: 120000, // Increased to 2 minutes
 };
 
 export const API_ENDPOINTS = {

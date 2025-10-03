@@ -9,7 +9,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
-  Key
+  Key,
+  FileText
 } from 'lucide-react';
 import ProjectSelector from './ProjectSelector';
 
@@ -38,6 +39,11 @@ const DashboardLayout = () => {
       name: 'Tasks',
       icon: <CheckSquare className="w-5 h-5" />,
       path: '/tasks'
+    },
+    {
+      name: 'Prompts',
+      icon: <FileText className="w-5 h-5" />,
+      path: '/prompts'
     },
     {
       name: 'Cron Jobs',

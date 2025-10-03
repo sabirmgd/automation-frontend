@@ -2,17 +2,19 @@ import { useState, useEffect } from 'react';
 import {
   CheckCircle, Circle, Clock, AlertCircle, User, Tag, Calendar,
   RefreshCw, Plus, Settings, Trash2, ChevronRight, Cloud, Server,
-  Database, GitBranch, Link2, ArrowLeft, Search, Filter, Eye
+  Database, GitBranch, Link2, ArrowLeft, Search, Filter, Eye, Brain, RotateCw
 } from 'lucide-react';
 import Select from 'react-select';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import jiraService from '../services/jiraService';
+import codeService from '../services/code.service';
 import type { JiraAccount, JiraBoard, JiraTicket, CreateJiraAccountDto } from '../types/jira.types';
 import { useProjectContext } from '../context/ProjectContext';
 import JiraAccountModal from './jira/JiraAccountModal';
 import TicketDetailsModal from './jira/TicketDetailsModal';
+import { toast } from 'react-hot-toast';
 
 const JiraComprehensive = () => {
   const { selectedProject } = useProjectContext();
@@ -33,10 +35,20 @@ const JiraComprehensive = () => {
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [assigneeFilter, setAssigneeFilter] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [analyzingTickets, setAnalyzingTickets] = useState<Set<string>>(new Set());
+  const [ticketsWithNewAIComments, setTicketsWithNewAIComments] = useState<Set<string>>(new Set());
+  const [checkingComments, setCheckingComments] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadAccounts();
   }, [selectedProject]);
+
+  useEffect(() => {
+    // Check for new AI comments when tickets are loaded
+    if (tickets.length > 0) {
+      checkAllTicketsForAIComments();
+    }
+  }, [tickets]);
 
   const loadAccounts = async () => {
     setLoading(true);
@@ -116,6 +128,103 @@ const JiraComprehensive = () => {
   const handleViewTicketDetails = (ticket: JiraTicket) => {
     setSelectedTicket(ticket);
     setShowTicketDetails(true);
+  };
+
+  const checkAllTicketsForAIComments = async () => {
+    try {
+      const ticketIds = tickets.map(t => t.id);
+      const results = await codeService.checkForNewAIComments(ticketIds);
+
+      const ticketsWithComments = new Set<string>();
+      Object.entries(results).forEach(([ticketId, hasNewComment]) => {
+        if (hasNewComment) {
+          const ticket = tickets.find(t => t.id === ticketId);
+          if (ticket) {
+            ticketsWithComments.add(ticket.id);
+          }
+        }
+      });
+
+      setTicketsWithNewAIComments(ticketsWithComments);
+    } catch (error) {
+      console.error('Failed to check for AI comments:', error);
+    }
+  };
+
+  const checkSingleTicketForAIComments = async (ticket: JiraTicket) => {
+    setCheckingComments(prev => new Set(prev).add(ticket.id));
+
+    try {
+      const results = await codeService.checkForNewAIComments([ticket.id]);
+
+      if (results[ticket.id]) {
+        setTicketsWithNewAIComments(prev => new Set(prev).add(ticket.id));
+        toast.success(`New AI analysis available for ${ticket.key}`);
+      } else {
+        setTicketsWithNewAIComments(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(ticket.id);
+          return newSet;
+        });
+        toast(`No new AI comments for ${ticket.key}`, {
+          icon: 'ℹ️',
+          duration: 3000
+        });
+      }
+    } catch (error) {
+      console.error('Failed to check ticket comments:', error);
+      toast.error('Failed to check for updates');
+    } finally {
+      setCheckingComments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(ticket.id);
+        return newSet;
+      });
+    }
+  };
+
+  const handleAnalyzeTicket = async (ticket: JiraTicket) => {
+    if (!selectedProject?.id) {
+      toast.error('Please select a project first');
+      return;
+    }
+
+    const ticketKey = ticket.key;
+
+    // Mark ticket as being analyzed
+    setAnalyzingTickets(prev => new Set(prev).add(ticket.id));
+
+    const toastId = toast.loading(`Starting analysis for ${ticketKey}...`);
+
+    try {
+      const result = await codeService.createPreliminaryAnalysis(
+        selectedProject.id,
+        ticket.id
+      );
+
+      toast.success(
+        `Analysis started for ${ticketKey}! It will run in the background for up to 10 minutes. Click refresh to check for updates.`,
+        {
+          id: toastId,
+          duration: 6000
+        }
+      );
+
+      console.log('Analysis started:', result);
+    } catch (error: any) {
+      console.error('Analysis failed:', error);
+      toast.error(`Failed to start analysis for ${ticketKey}: ${error.message || 'Unknown error'}`, {
+        id: toastId,
+        duration: 5000
+      });
+    } finally {
+      // Remove from analyzing set
+      setAnalyzingTickets(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(ticket.id);
+        return newSet;
+      });
+    }
   };
 
   const getStatusIcon = (status: string) => {
@@ -601,15 +710,45 @@ const JiraComprehensive = () => {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleViewTicketDetails(ticket)}
-                        className="hover:bg-blue-50"
-                      >
-                        <Eye className="w-4 h-4 mr-1" />
-                        View
-                      </Button>
+                      <div className="flex gap-2 items-center">
+                        <div className="relative">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleViewTicketDetails(ticket)}
+                            className="hover:bg-blue-50"
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            View
+                          </Button>
+                          {ticketsWithNewAIComments.has(ticket.id) && (
+                            <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                            </span>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleAnalyzeTicket(ticket)}
+                          disabled={analyzingTickets.has(ticket.id)}
+                          className="hover:bg-purple-50"
+                        >
+                          <Brain className={`w-4 h-4 mr-1 ${analyzingTickets.has(ticket.id) ? 'animate-pulse' : ''}`} />
+                          {analyzingTickets.has(ticket.id) ? 'Starting...' : 'Analyze'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => checkSingleTicketForAIComments(ticket)}
+                          disabled={checkingComments.has(ticket.id)}
+                          className="hover:bg-green-50"
+                          title="Check for new AI comments"
+                        >
+                          <RotateCw className={`w-4 h-4 ${checkingComments.has(ticket.id) ? 'animate-spin' : ''}`} />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}

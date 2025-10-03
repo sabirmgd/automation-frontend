@@ -1,10 +1,11 @@
-import { X, Folder } from 'lucide-react';
+import { X } from 'lucide-react';
 // @ts-ignore
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import type { Project, CreateProjectDto, UpdateProjectDto } from '../../types/project.types';
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
+import PathSelector from '../common/PathSelector';
 
 const projectSchema = z.object({
   name: z.string().min(1, 'Project name is required'),
@@ -18,6 +19,7 @@ const projectSchema = z.object({
   jiraKey: z.string().optional(),
   gitlabUrl: z.string().optional(),
   jiraUrl: z.string().optional(),
+  agentNavigationInfo: z.string().optional(),
 });
 
 interface ProjectModalProps {
@@ -35,7 +37,8 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
   project,
   title
 }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeTab, setActiveTab] = useState<'general' | 'configuration'>('general');
+
   const {
     register,
     handleSubmit,
@@ -56,7 +59,8 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
       gitlabId: '',
       jiraKey: '',
       gitlabUrl: '',
-      jiraUrl: ''
+      jiraUrl: '',
+      agentNavigationInfo: ''
     }
   });
 
@@ -75,7 +79,8 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
         gitlabId: project.gitlabId || '',
         jiraKey: project.jiraKey || '',
         gitlabUrl: project.gitlabUrl || '',
-        jiraUrl: project.jiraUrl || ''
+        jiraUrl: project.jiraUrl || '',
+        agentNavigationInfo: project.agentNavigationInfo || ''
       });
     } else {
       reset({
@@ -89,30 +94,11 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
         gitlabId: '',
         jiraKey: '',
         gitlabUrl: '',
-        jiraUrl: ''
+        jiraUrl: '',
+        agentNavigationInfo: ''
       });
     }
   }, [project, reset]);
-
-  const handleSelectPath = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
-
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      // Get the path from the first file and extract directory
-      const fullPath = files[0].webkitRelativePath || files[0].name;
-      const pathParts = fullPath.split('/');
-      if (pathParts.length > 1) {
-        // Remove filename to get directory path
-        pathParts.pop();
-        setValue('localPath', pathParts.join('/'));
-      }
-    }
-  };
 
   const handleFormSubmit = async (data: any) => {
     const formData = {
@@ -131,7 +117,8 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
       gitlabId: '',
       jiraKey: '',
       gitlabUrl: '',
-      jiraUrl: ''
+      jiraUrl: '',
+      agentNavigationInfo: ''
     });
     onClose();
   };
@@ -153,7 +140,37 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="p-6">
+        <form onSubmit={handleSubmit(handleFormSubmit)}>
+          <div className="border-b">
+            <div className="flex">
+              <button
+                type="button"
+                onClick={() => setActiveTab('general')}
+                className={`px-6 py-3 text-sm font-medium ${
+                  activeTab === 'general'
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                General
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('configuration')}
+                className={`px-6 py-3 text-sm font-medium ${
+                  activeTab === 'configuration'
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Configuration
+              </button>
+            </div>
+          </div>
+
+          <div className="p-6">
+          {activeTab === 'general' && (
+            <>
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Project Name
@@ -215,39 +232,6 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
 
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Local Project Path
-            </label>
-            <div className="flex gap-2">
-              <input
-                {...register('localPath')}
-                type="text"
-                className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter or select project path"
-              />
-              <button
-                type="button"
-                onClick={handleSelectPath}
-                className="px-3 py-2 border rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
-                title="Select folder"
-              >
-                <Folder className="w-4 h-4" />
-                Browse
-              </button>
-            </div>
-            {/* Hidden file input for directory selection */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              webkitdirectory=""
-              directory=""
-              multiple
-              onChange={handleFileInputChange}
-              className="hidden"
-            />
-          </div>
-
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
               Tags (comma-separated)
             </label>
             <input
@@ -257,7 +241,39 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
               placeholder="e.g., frontend, backend, urgent"
             />
           </div>
+            </>
+          )}
 
+          {activeTab === 'configuration' && (
+            <>
+          <div className="mb-4">
+            <PathSelector
+              label="Local Project Path"
+              value={localPath || ''}
+              onChange={(value) => setValue('localPath', value as string)}
+              placeholder="Enter project path"
+            />
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Agent Navigation Information
+            </label>
+            <textarea
+              {...register('agentNavigationInfo')}
+              rows={8}
+              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Add navigation hints, context, or instructions for AI agents working with this project..."
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Provide context about project structure, key files, conventions, and navigation patterns
+            </p>
+          </div>
+            </>
+          )}
+          </div>
+
+          <div className="px-6 pb-6">
           <div className="flex justify-end gap-3">
             <button
               type="button"
@@ -273,6 +289,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
             >
               {isSubmitting ? 'Saving...' : (project ? 'Update' : 'Create')}
             </button>
+          </div>
           </div>
         </form>
       </div>

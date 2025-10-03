@@ -124,3 +124,26 @@ export interface CreateJiraAccountDto {
 }
 
 export interface UpdateJiraAccountDto extends Partial<CreateJiraAccountDto> {}
+
+// Hidden Comments Types
+export type AuthorType = 'user' | 'ai';
+
+export interface HiddenComment {
+  id: string;
+  ticketId: string;
+  content: string;
+  authorType: AuthorType;
+  authorName: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateHiddenCommentDto {
+  content: string;
+  authorType: AuthorType;
+  authorName?: string;
+}
+
+export interface UpdateHiddenCommentDto {
+  content?: string;
+}
