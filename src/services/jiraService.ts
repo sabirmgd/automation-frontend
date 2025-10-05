@@ -55,8 +55,17 @@ class JiraService {
     return data;
   }
 
-  async syncBoard(boardId: string): Promise<void> {
-    await apiClient.post(`/jira/boards/${boardId}/sync`);
+  async syncBoard(
+    boardId: string,
+    assigneeAccountId?: string,
+    syncMode?: 'assigned' | 'all' | 'custom',
+    customJql?: string
+  ): Promise<void> {
+    const body: any = {};
+    if (assigneeAccountId) body.assigneeAccountId = assigneeAccountId;
+    if (syncMode) body.syncMode = syncMode;
+    if (customJql) body.customJql = customJql;
+    await apiClient.post(`/jira/boards/${boardId}/sync`, body);
   }
 
   // Ticket Management
@@ -84,8 +93,51 @@ class JiraService {
     return data;
   }
 
-  async syncTickets(boardId: string): Promise<void> {
-    await apiClient.post(`/jira/tickets/board/${boardId}/sync`);
+  async syncTickets(
+    boardId: string,
+    assigneeAccountId?: string,
+    syncMode?: 'assigned' | 'all' | 'custom',
+    customJql?: string
+  ): Promise<void> {
+    const body: any = {};
+    if (assigneeAccountId) body.assigneeAccountId = assigneeAccountId;
+    if (syncMode) body.syncMode = syncMode;
+    if (customJql) body.customJql = customJql;
+    await apiClient.post(`/jira/tickets/board/${boardId}/sync`, body);
+  }
+
+  async syncSingleTicket(key: string, mainProjectId?: string, boardId?: string): Promise<JiraTicket> {
+    const { data } = await apiClient.post(`/jira/tickets/key/${key}/sync`, {
+      mainProjectId,
+      boardId
+    });
+    return data.ticket;
+  }
+
+  // User Management
+  async getUsers(): Promise<any[]> {
+    const { data } = await apiClient.get('/jira/users');
+    return data;
+  }
+
+  async getUserById(id: string): Promise<any> {
+    const { data } = await apiClient.get(`/jira/users/${id}`);
+    return data;
+  }
+
+  async getUserByAccountId(accountId: string): Promise<any> {
+    const { data } = await apiClient.get(`/jira/users/account/${accountId}`);
+    return data;
+  }
+
+  async searchUsers(query: string): Promise<any[]> {
+    const { data } = await apiClient.get('/jira/users/search', { params: { q: query } });
+    return data;
+  }
+
+  async syncUsersFromJira(jiraAccountId: string): Promise<any[]> {
+    const { data } = await apiClient.get(`/jira/users/sync/${jiraAccountId}`);
+    return data;
   }
 
   // Project Management
@@ -94,8 +146,24 @@ class JiraService {
     return data;
   }
 
+  async getAllProjects(): Promise<JiraProject[]> {
+    const { data } = await apiClient.get<JiraProject[]>('/jira/projects');
+    return data;
+  }
+
+  async getProjectsByAccount(accountId: string): Promise<JiraProject[]> {
+    const { data } = await apiClient.get<JiraProject[]>(`/jira/projects/account/${accountId}`);
+    return data;
+  }
+
   async syncProjects(accountId: string): Promise<void> {
     await apiClient.post(`/jira/accounts/${accountId}/sync-projects`);
+  }
+
+  async syncProjectTickets(projectId: string, assigneeAccountId?: string): Promise<any> {
+    const body = assigneeAccountId ? { assigneeAccountId } : {};
+    const { data } = await apiClient.post(`/jira/projects/${projectId}/sync`, body);
+    return data;
   }
 
   // Pull Request Integration

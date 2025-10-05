@@ -10,7 +10,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import jiraService from '../services/jiraService';
 import codeService from '../services/code.service';
-import type { JiraAccount, JiraBoard, JiraTicket, CreateJiraAccountDto } from '../types/jira.types';
+import type { JiraAccount, JiraBoard, JiraTicket, JiraProject, CreateJiraAccountDto } from '../types/jira.types';
 import { useProjectContext } from '../context/ProjectContext';
 import JiraAccountModal from './jira/JiraAccountModal';
 import TicketDetailsModal from './jira/TicketDetailsModal';
@@ -18,11 +18,13 @@ import { toast } from 'react-hot-toast';
 
 const JiraComprehensive = () => {
   const { selectedProject } = useProjectContext();
-  const [view, setView] = useState<'accounts' | 'boards' | 'tickets'>('accounts');
+  const [view, setView] = useState<'accounts' | 'projects' | 'boards' | 'tickets'>('accounts');
   const [accounts, setAccounts] = useState<JiraAccount[]>([]);
+  const [projects, setProjects] = useState<JiraProject[]>([]);
   const [boards, setBoards] = useState<JiraBoard[]>([]);
   const [tickets, setTickets] = useState<JiraTicket[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<JiraAccount | null>(null);
+  const [selectedJiraProject, setSelectedJiraProject] = useState<JiraProject | null>(null);
   const [selectedBoard, setSelectedBoard] = useState<JiraBoard | null>(null);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -38,6 +40,12 @@ const JiraComprehensive = () => {
   const [analyzingTickets, setAnalyzingTickets] = useState<Set<string>>(new Set());
   const [ticketsWithNewAIComments, setTicketsWithNewAIComments] = useState<Set<string>>(new Set());
   const [checkingComments, setCheckingComments] = useState<Set<string>>(new Set());
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [showAllTickets, setShowAllTickets] = useState(false);
+  const [syncMode, setSyncMode] = useState<'assigned' | 'all' | 'custom'>('assigned');
+  const [customJql, setCustomJql] = useState('');
+  const [ticketKeyToSync, setTicketKeyToSync] = useState('');
+  const [syncingTicketKey, setSyncingTicketKey] = useState(false);
 
   useEffect(() => {
     loadAccounts();
@@ -90,6 +98,30 @@ const JiraComprehensive = () => {
     }
   };
 
+  const loadUsers = async () => {
+    try {
+      const users = await jiraService.getUsers();
+      setAllUsers(users);
+
+      // If no users found locally, sync from Jira automatically
+      if (users.length === 0 && selectedAccount) {
+        const syncedUsers = await jiraService.syncUsersFromJira(selectedAccount.id);
+        setAllUsers(syncedUsers);
+      }
+    } catch (error) {
+      console.error('Failed to load users:', error);
+      // Try to sync from Jira as fallback
+      if (selectedAccount) {
+        try {
+          const syncedUsers = await jiraService.syncUsersFromJira(selectedAccount.id);
+          setAllUsers(syncedUsers);
+        } catch (syncError) {
+          console.error('Failed to sync users from Jira:', syncError);
+        }
+      }
+    }
+  };
+
   const handleSyncAccount = async (account: JiraAccount) => {
     setSyncing(true);
     try {
@@ -113,10 +145,11 @@ const JiraComprehensive = () => {
     }
   };
 
-  const handleAccountClick = (account: JiraAccount) => {
+  const handleAccountClick = async (account: JiraAccount) => {
     setSelectedAccount(account);
     setView('boards');
-    loadBoards(account.id);
+    await loadBoards(account.id);
+    await loadUsers(); // Load all users when account is selected
   };
 
   const handleBoardClick = (board: JiraBoard) => {
@@ -249,18 +282,27 @@ const JiraComprehensive = () => {
   // Get unique values for filters
   const uniqueStatuses = Array.from(new Set(tickets.map(t => t.status))).sort();
   const uniquePriorities = Array.from(new Set(tickets.map(t => t.priority).filter(Boolean))).sort();
-  const uniqueAssignees = Array.from(new Set(tickets.map(t => t.assignee?.displayName).filter(Boolean))).sort();
 
   // Convert to react-select options
   const statusOptions = uniqueStatuses.map(status => ({ value: status, label: status }));
   const priorityOptions = uniquePriorities.map(priority => ({ value: priority!, label: priority! }));
-  const assigneeOptions = uniqueAssignees.map(assignee => ({ value: assignee!, label: assignee! }));
+
+  // Use all users for assignee options, not just those in current tickets
+  const assigneeOptions = [
+    { value: 'unassigned', label: 'Unassigned' },
+    ...allUsers.map(user => ({
+      value: user.accountId,
+      label: user.displayName || user.emailAddress || user.accountId
+    }))
+  ];
 
   // Filter tickets based on all filters
   const filteredTickets = tickets.filter(ticket => {
     const matchesStatus = statusFilter.length === 0 || statusFilter.includes(ticket.status);
     const matchesPriority = priorityFilter.length === 0 || (ticket.priority && priorityFilter.includes(ticket.priority));
-    const matchesAssignee = assigneeFilter.length === 0 || (ticket.assignee && assigneeFilter.includes(ticket.assignee.displayName));
+    const matchesAssignee = assigneeFilter.length === 0 ||
+      (assigneeFilter.includes('unassigned') && !ticket.assignee) ||
+      (ticket.assignee && assigneeFilter.includes(ticket.assignee.accountId));
     const matchesSearch = searchQuery === '' ||
       ticket.key.toLowerCase().includes(searchQuery.toLowerCase()) ||
       ticket.summary.toLowerCase().includes(searchQuery.toLowerCase());
@@ -538,11 +580,31 @@ const JiraComprehensive = () => {
                     if (selectedBoard) {
                       setSyncing(true);
                       try {
-                        await jiraService.syncTickets(selectedBoard.id);
-                        console.log(`Syncing tickets for board ${selectedBoard.name}`);
+                        if (showAllTickets && selectedBoard.projectId) {
+                          // Sync all tickets from the project
+                          await jiraService.syncProjectTickets(selectedBoard.projectId);
+                          console.log(`Syncing ALL tickets for project ${selectedBoard.projectKey}`);
+                        } else {
+                          // Use the new sync modes
+                          const jql = syncMode === 'custom' ? customJql : undefined;
+                          await jiraService.syncTickets(selectedBoard.id, undefined, syncMode, jql);
+
+                          const modeText = syncMode === 'all' ? 'all' : syncMode === 'custom' ? 'custom query' : 'assigned';
+                          console.log(`Syncing ${modeText} tickets for ${selectedBoard.name}`);
+                        }
                         await loadTickets(selectedBoard.id);
+
+                        const successMsg = showAllTickets
+                          ? 'Synced all project tickets'
+                          : syncMode === 'all'
+                            ? 'Synced all board tickets'
+                            : syncMode === 'custom'
+                              ? 'Synced tickets from custom query'
+                              : 'Synced assigned tickets';
+                        toast.success(successMsg);
                       } catch (error) {
                         console.error('Failed to sync tickets:', error);
+                        toast.error('Failed to sync tickets');
                       } finally {
                         setSyncing(false);
                       }
@@ -569,6 +631,140 @@ const JiraComprehensive = () => {
           {/* Filter Bar */}
           {showFilters && (
             <div className="p-4 bg-gray-50 border-b">
+              {/* Sync Mode Selection */}
+              <div className="mb-4">
+                <div className="flex items-center gap-4 mb-3">
+                  <label className="text-sm font-medium text-gray-700">Sync Mode:</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setSyncMode('assigned')}
+                      className={`px-3 py-1 text-sm rounded ${
+                        syncMode === 'assigned'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      My Tickets
+                    </button>
+                    <button
+                      onClick={() => setSyncMode('all')}
+                      className={`px-3 py-1 text-sm rounded ${
+                        syncMode === 'all'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      All Tickets
+                    </button>
+                    <button
+                      onClick={() => setSyncMode('custom')}
+                      className={`px-3 py-1 text-sm rounded ${
+                        syncMode === 'custom'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      Custom JQL
+                    </button>
+                  </div>
+                </div>
+
+                {/* Custom JQL Input */}
+                {syncMode === 'custom' && (
+                  <div className="mb-3">
+                    <input
+                      type="text"
+                      placeholder="Enter JQL query (e.g., project = PROJ AND status = 'In Progress')"
+                      value={customJql}
+                      onChange={(e) => setCustomJql(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                )}
+
+                {/* Pull Single Ticket */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700">Pull Ticket:</label>
+                  <input
+                    type="text"
+                    placeholder="Enter ticket key (e.g., PROJ-123)"
+                    value={ticketKeyToSync}
+                    onChange={(e) => setTicketKeyToSync(e.target.value.toUpperCase())}
+                    className="px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      if (!ticketKeyToSync.trim()) {
+                        toast.error('Please enter a ticket key');
+                        return;
+                      }
+                      setSyncingTicketKey(true);
+                      try {
+                        await jiraService.syncSingleTicket(
+                          ticketKeyToSync,
+                          selectedProject?.id,
+                          selectedBoard?.id
+                        );
+                        toast.success(`Successfully pulled ticket ${ticketKeyToSync}`);
+                        setTicketKeyToSync('');
+                        // Reload tickets to show the new one
+                        if (selectedBoard) {
+                          await loadTickets(selectedBoard.id);
+                        }
+                      } catch (error) {
+                        console.error('Failed to sync ticket:', error);
+                        toast.error(`Failed to pull ticket ${ticketKeyToSync}`);
+                      } finally {
+                        setSyncingTicketKey(false);
+                      }
+                    }}
+                    disabled={syncingTicketKey || !ticketKeyToSync.trim()}
+                  >
+                    {syncingTicketKey ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      'Pull'
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Toggle for All/Board tickets */}
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700">Ticket Scope:</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowAllTickets(false)}
+                      className={`px-3 py-1 text-sm rounded ${
+                        !showAllTickets
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      Board Tickets (Sprint)
+                    </button>
+                    <button
+                      onClick={() => setShowAllTickets(true)}
+                      className={`px-3 py-1 text-sm rounded ${
+                        showAllTickets
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      All Project Tickets
+                    </button>
+                  </div>
+                </div>
+                {showAllTickets && (
+                  <span className="text-sm text-amber-600">
+                    ⚠️ Sync required to load all project tickets
+                  </span>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-700 mb-1 block">Status</label>
@@ -631,7 +827,7 @@ const JiraComprehensive = () => {
               </div>
               <div className="flex justify-between items-center mt-4">
                 <div className="text-sm text-gray-600">
-                  Showing <span className="font-semibold">{filteredTickets.length}</span> of {tickets.length} tickets
+                  Showing <span className="font-semibold">{filteredTickets.length}</span> of {tickets.length} {showAllTickets ? 'project' : 'board'} tickets
                   {(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0 || searchQuery) && (
                     <span className="ml-2">
                       ({statusFilter.length > 0 && `${statusFilter.length} status${statusFilter.length > 1 ? 'es' : ''}`}
