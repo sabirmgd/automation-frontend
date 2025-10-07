@@ -10,6 +10,7 @@ import Tasks from './pages/Tasks';
 import PromptsPage from './pages/PromptsPage';
 import { CronsPage } from './pages/CronsPage';
 import { CronDetailsPage } from './pages/CronDetailsPage';
+import PipelineDetail from './pages/PipelineDetail';
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
             <Route path="crons/:id" element={<CronDetailsPage />} />
             <Route path="jira" element={<JiraComprehensive />} />
             <Route path="git" element={<GitManagementImproved />} />
+            <Route path="pipeline/:ticketId" element={<PipelineDetail />} />
           </Route>
         </Routes>
       </BrowserRouter>

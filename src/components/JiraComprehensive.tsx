@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  CheckCircle, Circle, Clock, AlertCircle, User, Tag, Calendar,
-  RefreshCw, Plus, Settings, Trash2, ChevronRight, Cloud, Server,
-  Database, GitBranch, Link2, ArrowLeft, Search, Filter, Eye, Brain, RotateCw
+  CheckCircle, Circle, Clock, AlertCircle, User,
+  RefreshCw, Plus, Settings, ChevronRight, Cloud, Server,
+  Database, GitBranch, ArrowLeft, Filter, Eye, Brain, RotateCw, Layers
 } from 'lucide-react';
 import Select from 'react-select';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -18,13 +19,12 @@ import { toast } from 'react-hot-toast';
 
 const JiraComprehensive = () => {
   const { selectedProject } = useProjectContext();
+  const navigate = useNavigate();
   const [view, setView] = useState<'accounts' | 'projects' | 'boards' | 'tickets'>('accounts');
   const [accounts, setAccounts] = useState<JiraAccount[]>([]);
-  const [projects, setProjects] = useState<JiraProject[]>([]);
   const [boards, setBoards] = useState<JiraBoard[]>([]);
   const [tickets, setTickets] = useState<JiraTicket[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<JiraAccount | null>(null);
-  const [selectedJiraProject, setSelectedJiraProject] = useState<JiraProject | null>(null);
   const [selectedBoard, setSelectedBoard] = useState<JiraBoard | null>(null);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -161,6 +161,11 @@ const JiraComprehensive = () => {
   const handleViewTicketDetails = (ticket: JiraTicket) => {
     setSelectedTicket(ticket);
     setShowTicketDetails(true);
+  };
+
+  const handlePipelineView = (ticket: JiraTicket) => {
+    // Navigate to pipeline page with ticket data
+    navigate(`/pipeline/${ticket.id}`, { state: { ticket, selectedProject } });
   };
 
   const checkAllTicketsForAIComments = async () => {
@@ -933,6 +938,16 @@ const JiraComprehensive = () => {
                         >
                           <Brain className={`w-4 h-4 mr-1 ${analyzingTickets.has(ticket.id) ? 'animate-pulse' : ''}`} />
                           {analyzingTickets.has(ticket.id) ? 'Starting...' : 'Analyze'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handlePipelineView(ticket)}
+                          className="hover:bg-indigo-50"
+                          title="View pipeline details"
+                        >
+                          <Layers className="w-4 h-4 mr-1" />
+                          Pipeline
                         </Button>
                         <Button
                           size="sm"

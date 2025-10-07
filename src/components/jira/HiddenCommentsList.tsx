@@ -163,6 +163,11 @@ const HiddenCommentsList: React.FC<HiddenCommentsListProps> = ({
                         {comment.updatedAt !== comment.createdAt && (
                           <span className="text-gray-400">(edited)</span>
                         )}
+                        {comment.sessionId && isAI && (
+                          <span className="text-purple-500 font-mono text-[10px] ml-2">
+                            Session: {comment.sessionId.substring(0, 8)}...
+                          </span>
+                        )}
                       </div>
                     </div>
 
