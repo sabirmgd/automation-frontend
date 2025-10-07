@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle, Circle, Clock, AlertCircle, User,
   RefreshCw, Plus, Settings, ChevronRight, Cloud, Server,
@@ -19,7 +18,6 @@ import { toast } from 'react-hot-toast';
 
 const JiraComprehensive = () => {
   const { selectedProject } = useProjectContext();
-  const navigate = useNavigate();
   const [view, setView] = useState<'accounts' | 'projects' | 'boards' | 'tickets'>('accounts');
   const [accounts, setAccounts] = useState<JiraAccount[]>([]);
   const [boards, setBoards] = useState<JiraBoard[]>([]);
@@ -42,6 +40,7 @@ const JiraComprehensive = () => {
   const [checkingComments, setCheckingComments] = useState<Set<string>>(new Set());
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [showAllTickets, setShowAllTickets] = useState(false);
+  const [aiFilter, setAiFilter] = useState<'all' | 'with-ai' | 'without-ai'>('all');
   const [syncMode, setSyncMode] = useState<'assigned' | 'all' | 'custom'>('assigned');
   const [customJql, setCustomJql] = useState('');
   const [ticketKeyToSync, setTicketKeyToSync] = useState('');
@@ -164,8 +163,14 @@ const JiraComprehensive = () => {
   };
 
   const handlePipelineView = (ticket: JiraTicket) => {
-    // Navigate to pipeline page with ticket data
-    navigate(`/pipeline/${ticket.id}`, { state: { ticket, selectedProject } });
+    // Open pipeline page in a new tab with ticket data stored in sessionStorage
+    const pipelineUrl = `/pipeline/${ticket.id}`;
+
+    // Store the ticket and project data in sessionStorage for the new tab
+    sessionStorage.setItem(`pipeline-${ticket.id}`, JSON.stringify({ ticket, selectedProject }));
+
+    // Open in new tab
+    window.open(pipelineUrl, '_blank');
   };
 
   const checkAllTicketsForAIComments = async () => {
@@ -311,7 +316,10 @@ const JiraComprehensive = () => {
     const matchesSearch = searchQuery === '' ||
       ticket.key.toLowerCase().includes(searchQuery.toLowerCase()) ||
       ticket.summary.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesStatus && matchesPriority && matchesAssignee && matchesSearch;
+    const matchesAI = aiFilter === 'all' ||
+      (aiFilter === 'with-ai' && ticketsWithNewAIComments.has(ticket.id)) ||
+      (aiFilter === 'without-ai' && !ticketsWithNewAIComments.has(ticket.id));
+    return matchesStatus && matchesPriority && matchesAssignee && matchesSearch && matchesAI;
   });
 
   const stats = {
@@ -629,6 +637,34 @@ const JiraComprehensive = () => {
                   <Filter className="w-4 h-4 mr-2" />
                   Filter
                 </Button>
+                <Button
+                  variant={aiFilter === 'with-ai' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setAiFilter(aiFilter === 'with-ai' ? 'all' : 'with-ai')}
+                  className={aiFilter === 'with-ai' ? 'bg-purple-600 hover:bg-purple-700 text-white' : ''}
+                >
+                  <Brain className="w-4 h-4 mr-2" />
+                  With AI
+                  {ticketsWithNewAIComments.size > 0 && (
+                    <span className="ml-2 bg-white/20 text-xs px-1.5 py-0.5 rounded">
+                      {ticketsWithNewAIComments.size}
+                    </span>
+                  )}
+                </Button>
+                <Button
+                  variant={aiFilter === 'without-ai' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setAiFilter(aiFilter === 'without-ai' ? 'all' : 'without-ai')}
+                  className={aiFilter === 'without-ai' ? 'bg-orange-600 hover:bg-orange-700 text-white' : ''}
+                >
+                  <AlertCircle className="w-4 h-4 mr-2" />
+                  No AI
+                  {tickets.length - ticketsWithNewAIComments.size > 0 && (
+                    <span className="ml-2 bg-white/20 text-xs px-1.5 py-0.5 rounded">
+                      {tickets.length - ticketsWithNewAIComments.size}
+                    </span>
+                  )}
+                </Button>
               </div>
             </div>
           </div>
@@ -833,16 +869,18 @@ const JiraComprehensive = () => {
               <div className="flex justify-between items-center mt-4">
                 <div className="text-sm text-gray-600">
                   Showing <span className="font-semibold">{filteredTickets.length}</span> of {tickets.length} {showAllTickets ? 'project' : 'board'} tickets
-                  {(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0 || searchQuery) && (
+                  {(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0 || searchQuery || aiFilter !== 'all') && (
                     <span className="ml-2">
                       ({statusFilter.length > 0 && `${statusFilter.length} status${statusFilter.length > 1 ? 'es' : ''}`}
                       {priorityFilter.length > 0 && `${statusFilter.length > 0 ? ', ' : ''}${priorityFilter.length} priorit${priorityFilter.length > 1 ? 'ies' : 'y'}`}
                       {assigneeFilter.length > 0 && `${(statusFilter.length > 0 || priorityFilter.length > 0) ? ', ' : ''}${assigneeFilter.length} assignee${assigneeFilter.length > 1 ? 's' : ''}`}
-                      {searchQuery && `${(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0) ? ', ' : ''}search: "${searchQuery}"`})
+                      {searchQuery && `${(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0) ? ', ' : ''}search: "${searchQuery}"`}
+                      {aiFilter === 'with-ai' && `${(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0 || searchQuery) ? ', ' : ''}with AI replies`}
+                      {aiFilter === 'without-ai' && `${(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0 || searchQuery) ? ', ' : ''}without AI replies`})
                     </span>
                   )}
                 </div>
-                {(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0 || searchQuery) && (
+                {(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0 || searchQuery || aiFilter !== 'all') && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -851,6 +889,7 @@ const JiraComprehensive = () => {
                       setPriorityFilter([]);
                       setAssigneeFilter([]);
                       setSearchQuery('');
+                      setAiFilter('all');
                     }}
                   >
                     Clear All Filters

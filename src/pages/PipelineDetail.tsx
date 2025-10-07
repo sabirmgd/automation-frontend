@@ -11,11 +11,13 @@ import { Badge } from '../components/ui/badge';
 import TicketDetailsModal from '../components/jira/TicketDetailsModal';
 import AnalysisMarkdownRenderer from '../components/ui/AnalysisMarkdownRenderer';
 import WorktreeSection from '../components/workflow/WorktreeSection';
+import HappySessionSection from '../components/workflow/HappySessionSection';
 import jiraService from '../services/jiraService';
 import codeService from '../services/code.service';
 import { toast } from 'react-hot-toast';
 import { checkAnalysisStatus, formatAnalysisForDisplay } from '../lib/utils';
 import type { JiraTicket, HiddenComment } from '../types/jira.types';
+import { useProjectContext } from '../context/ProjectContext';
 
 const statusConfig: Record<string, { icon: any; color: string }> = {
   'To Do': { icon: Circle, color: 'text-gray-500' },
@@ -31,10 +33,48 @@ const PipelineDetail = () => {
   const { ticketId } = useParams<{ ticketId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
+  const { selectedProject: contextProject } = useProjectContext();
 
-  // Get ticket data from navigation state or fetch it
-  const [ticket, setTicket] = useState<JiraTicket | null>(location.state?.ticket || null);
-  const [selectedProject] = useState(location.state?.selectedProject || null);
+  // Get initial data from navigation state or sessionStorage
+  const getInitialData = () => {
+    let ticketData = null;
+    let projectData = null;
+
+    // First try navigation state
+    if (location.state?.ticket) {
+      ticketData = location.state.ticket;
+    }
+    if (location.state?.selectedProject) {
+      projectData = location.state.selectedProject;
+    }
+
+    // If not found in navigation state, try sessionStorage (for new tab scenario)
+    if ((!ticketData || !projectData) && ticketId) {
+      const storedData = sessionStorage.getItem(`pipeline-${ticketId}`);
+      if (storedData) {
+        try {
+          const parsed = JSON.parse(storedData);
+          if (!ticketData) {
+            ticketData = parsed.ticket;
+          }
+          if (!projectData) {
+            projectData = parsed.selectedProject;
+          }
+          // Clean up sessionStorage after reading both values
+          sessionStorage.removeItem(`pipeline-${ticketId}`);
+        } catch (error) {
+          console.error('Failed to parse stored data:', error);
+        }
+      }
+    }
+
+    return { ticket: ticketData, project: projectData };
+  };
+
+  const initialData = getInitialData();
+  const [ticket, setTicket] = useState<JiraTicket | null>(initialData.ticket);
+  // Use the project from initial data, or fallback to context project
+  const [selectedProject] = useState(initialData.project || contextProject);
   const [showTicketDetails, setShowTicketDetails] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -50,6 +90,7 @@ const PipelineDetail = () => {
   const [branchNameMetadata, setBranchNameMetadata] = useState<any>(null);
   const [generatingBranch, setGeneratingBranch] = useState(false);
   const [branchExpanded, setBranchExpanded] = useState(false);
+  const [worktreeCreated, setWorktreeCreated] = useState(false);
 
   useEffect(() => {
     // If we don't have ticket data from navigation, fetch it
@@ -64,7 +105,21 @@ const PipelineDetail = () => {
       fetchHiddenComments();
       fetchWorkflowData();
     }
-  }, [ticket?.id]);
+
+    // Set browser title to ticket summary (cleaner than description which might have JSON)
+    if (ticket) {
+      // Use summary first as it's usually cleaner, then key as fallback
+      const title = ticket.summary || `${ticket.key} - Pipeline`;
+      // Limit title length for browser tab
+      const cleanTitle = title.length > 60 ? title.substring(0, 60) + '...' : title;
+      document.title = cleanTitle;
+    }
+
+    // Cleanup function to reset title when leaving the page
+    return () => {
+      document.title = '30x Automation'; // Reset to default title
+    };
+  }, [ticket?.id, ticket?.summary, ticket?.key]);
 
   const fetchTicketDetails = async () => {
     if (!ticketId) return;
@@ -112,14 +167,24 @@ const PipelineDetail = () => {
         setBranchName(workflow.generatedBranchName);
         setBranchNameMetadata(workflow.branchNameMetadata);
       }
+      if (workflow?.worktreeId) {
+        setWorktreeCreated(true);
+      }
     } catch (error) {
       console.error('Failed to fetch workflow data:', error);
     }
   };
 
   const handleAnalyzeTicket = async () => {
-    if (!ticket || !selectedProject?.id) {
-      toast.error('Missing ticket or project information');
+    if (!ticket) {
+      toast.error('Missing ticket information. Please refresh the page.');
+      console.error('No ticket data available');
+      return;
+    }
+
+    if (!selectedProject?.id) {
+      toast.error('Missing project information. Please return to Jira page and try again.');
+      console.error('No project data available:', { ticket, selectedProject });
       return;
     }
 
@@ -582,16 +647,18 @@ const PipelineDetail = () => {
               <div className="text-center py-8">
                 <GitBranch className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground mb-2">
-                  {analysisStatus === 'complete'
-                    ? 'No branch name generated yet'
-                    : 'Complete the analysis first to generate a branch name'}
+                  {analysisStatus === 'none'
+                    ? 'Run analysis first to generate a branch name'
+                    : analysisStatus === 'pending'
+                    ? 'Analysis is outdated but you can still generate a branch name'
+                    : 'No branch name generated yet'}
                 </p>
                 <p className="text-xs text-muted-foreground mb-4">
                   A branch name will be automatically generated based on the ticket analysis
                 </p>
                 <Button
                   onClick={handleGenerateBranchName}
-                  disabled={generatingBranch || analysisStatus !== 'complete'}
+                  disabled={generatingBranch || analysisStatus === 'none'}
                   className="bg-purple-600 hover:bg-purple-700 text-white"
                 >
                   <GitBranch className={`w-4 h-4 mr-2 ${generatingBranch ? 'animate-pulse' : ''}`} />
@@ -611,7 +678,18 @@ const PipelineDetail = () => {
           analysisStatus={analysisStatus}
           onWorktreeCreated={(worktreePath) => {
             console.log('Worktree created at:', worktreePath);
+            setWorktreeCreated(true);
           }}
+        />
+      )}
+
+      {/* Happy Session Section */}
+      {ticket && (
+        <HappySessionSection
+          ticketId={ticket.id}
+          branchName={branchName}
+          worktreeCreated={worktreeCreated}
+          analysisStatus={analysisStatus}
         />
       )}
 

@@ -144,6 +144,17 @@ class CodeService {
     );
     return response.data;
   }
+
+  async deleteWorktree(
+    ticketId: string,
+    options?: { deleteBranch?: boolean; force?: boolean }
+  ): Promise<TicketWorkflow> {
+    const response = await apiClient.delete<TicketWorkflow>(
+      `${this.workflowPath}/ticket/${ticketId}/worktree`,
+      { data: options }
+    );
+    return response.data;
+  }
 }
 
 export default new CodeService();

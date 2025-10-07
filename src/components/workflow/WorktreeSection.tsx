@@ -6,6 +6,7 @@ import {
   ChevronUp,
   ChevronDown,
   Copy,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -36,6 +37,11 @@ const WorktreeSection = ({
   const [customBaseBranch, setCustomBaseBranch] = useState('');
   const [envHandling, setEnvHandling] = useState<'link' | 'copy' | 'skip'>('link');
   const [shareNodeModules, setShareNodeModules] = useState(false);
+
+  // Delete modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteBranch, setDeleteBranch] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Fetch workflow data on mount to check if worktree already exists
   useEffect(() => {
@@ -129,6 +135,32 @@ const WorktreeSection = ({
     }
   };
 
+  const handleDeleteWorktree = async () => {
+    setDeleting(true);
+    const toastId = toast.loading('Deleting worktree...');
+
+    try {
+      await codeService.deleteWorktree(ticketId, { deleteBranch });
+
+      setWorktreeData(null);
+      setShowDeleteModal(false);
+
+      toast.success(
+        `Worktree deleted successfully${deleteBranch ? ' (branch deleted)' : ''}!`,
+        { id: toastId, duration: 5000 }
+      );
+    } catch (error: any) {
+      console.error('Worktree deletion failed:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
+      toast.error(`Failed to delete worktree: ${errorMessage}`, {
+        id: toastId,
+        duration: 6000,
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader
@@ -212,6 +244,16 @@ const WorktreeSection = ({
                   </div>
                 </div>
               </div>
+
+              {/* Delete Button */}
+              <Button
+                variant="outline"
+                className="w-full mt-3 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-300"
+                onClick={() => setShowDeleteModal(true)}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete Worktree
+              </Button>
             </div>
           ) : (
             <div className="space-y-4">
@@ -380,6 +422,78 @@ const WorktreeSection = ({
             </div>
           )}
         </CardContent>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                <Trash2 className="w-6 h-6 text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold">Delete Worktree?</h3>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <p className="text-sm text-gray-600">
+                This will permanently delete the worktree directory and free up disk space.
+              </p>
+
+              <div className="bg-gray-50 rounded p-3">
+                <p className="text-xs font-medium text-gray-500 mb-1">Path to be deleted:</p>
+                <code className="text-xs text-gray-900 break-all">
+                  {worktreeData?.worktreePath}
+                </code>
+              </div>
+
+              <label className="flex items-start space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={deleteBranch}
+                  onChange={(e) => setDeleteBranch(e.target.checked)}
+                  className="mt-1 w-4 h-4 text-red-600 rounded"
+                />
+                <div className="flex-1">
+                  <span className="text-sm font-medium">Also delete the branch</span>
+                  <p className="text-xs text-gray-500 mt-1">
+                    "{worktreeData?.branchName}"
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    (Uncheck if you've already merged or want to keep working on it)
+                  </p>
+                </div>
+              </label>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
+                <p className="text-xs text-yellow-800">
+                  ⚠️ Warning: Any uncommitted changes in the worktree will be lost!
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteBranch(false);
+                }}
+                disabled={deleting}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDeleteWorktree}
+                disabled={deleting}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+              >
+                {deleting ? 'Deleting...' : 'Delete Worktree'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </Card>
   );

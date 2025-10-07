@@ -69,27 +69,33 @@ export function checkAnalysisStatus(
     return { status: 'none' };
   }
 
-  // Check if there are any user comments after the latest AI comment
+  // Get the timestamp of the latest AI comment
   const latestAITime = new Date(latestAIComment.createdAt).getTime();
 
-  // Check hidden comments for user comments after AI
-  const hasUserCommentAfterAI = sortedHidden.some(comment =>
-    comment.authorType === 'user' &&
-    new Date(comment.createdAt).getTime() > latestAITime
-  );
+  // Check if the most recent comment overall is from AI
+  const mostRecentComment = sortedHidden[0];
+  const isMostRecentFromAI = mostRecentComment.authorType === 'ai' &&
+    mostRecentComment.id === latestAIComment.id;
 
-  // Also check regular Jira comments if provided
-  if (regularComments && regularComments.length > 0) {
-    const hasRegularCommentAfterAI = regularComments.some(comment =>
-      new Date(comment.created || comment.createdAt).getTime() > latestAITime
-    );
+  // If the latest AI comment is the most recent overall, check regular comments too
+  if (isMostRecentFromAI) {
+    // Check if there are any regular Jira comments after the AI analysis
+    if (regularComments && regularComments.length > 0) {
+      const hasRegularCommentAfterAI = regularComments.some(comment => {
+        const commentTime = new Date(comment.created || comment.createdAt).getTime();
+        // Add small tolerance (1 second) to handle timestamp precision issues
+        return commentTime > (latestAITime + 1000);
+      });
 
-    if (hasRegularCommentAfterAI || hasUserCommentAfterAI) {
-      return { status: 'pending', latestAnalysis: latestAIComment };
+      if (hasRegularCommentAfterAI) {
+        return { status: 'pending', latestAnalysis: latestAIComment };
+      }
     }
-  } else if (hasUserCommentAfterAI) {
-    return { status: 'pending', latestAnalysis: latestAIComment };
+
+    // AI is most recent and no newer regular comments
+    return { status: 'complete', latestAnalysis: latestAIComment };
   }
 
-  return { status: 'complete', latestAnalysis: latestAIComment };
+  // If the most recent comment is not from AI, then there are comments after the AI analysis
+  return { status: 'pending', latestAnalysis: latestAIComment };
 }
