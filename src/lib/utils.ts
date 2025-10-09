@@ -46,6 +46,45 @@ export function formatAnalysisForDisplay(content: string): string {
 }
 
 /**
+ * Extract the verification content from a verification report
+ * Removes everything before "## 1. IMPLEMENTATION VERIFICATION SUMMARY" if it exists
+ */
+export function extractVerificationContent(content: string): string {
+  if (!content) return '';
+
+  // Find the position of "## 1. IMPLEMENTATION VERIFICATION SUMMARY"
+  const marker = "## 1. IMPLEMENTATION VERIFICATION SUMMARY";
+  const markerIndex = content.indexOf(marker);
+
+  if (markerIndex !== -1) {
+    // Return everything from the marker onwards
+    return content.substring(markerIndex).trim();
+  }
+
+  // If marker not found, return the original content
+  return content.trim();
+}
+
+/**
+ * Format verification report content for display
+ * Cleans up formatting and prepares for markdown rendering
+ */
+export function formatVerificationForDisplay(content: string): string {
+  if (!content) return '';
+
+  // Extract the actual verification content (starting from numbered sections)
+  let formatted = extractVerificationContent(content);
+
+  // Remove excessive blank lines (more than 2 consecutive)
+  formatted = formatted.replace(/\n{3,}/g, '\n\n');
+
+  // Ensure headers have proper spacing
+  formatted = formatted.replace(/^(#{1,6})\s*/gm, '$1 ');
+
+  return formatted;
+}
+
+/**
  * Check if analysis is complete based on comments
  * Returns 'complete' if last relevant comment is from AI, 'pending' otherwise
  */

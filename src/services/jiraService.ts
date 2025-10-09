@@ -77,6 +77,7 @@ class JiraService {
     search?: string;
     page?: number;
     limit?: number;
+    includeHidden?: boolean;
   }): Promise<{ tickets: JiraTicket[]; total: number }> {
     const { data } = await apiClient.get<JiraTicket[]>('/jira/tickets', { params });
     // Backend returns array directly, wrap it in expected format
@@ -211,6 +212,11 @@ class JiraService {
     await apiClient.patch(`/jira/tickets/${ticketId}/description`, { description });
   }
 
+  async toggleHiddenTicket(ticketId: string): Promise<JiraTicket> {
+    const { data } = await apiClient.patch(`/jira/tickets/${ticketId}/toggle-hidden`);
+    return data;
+  }
+
   async improveTicketDescription(description: string, context?: string): Promise<{
     title: string;
     description: string;
@@ -218,6 +224,10 @@ class JiraService {
     technicalDetails?: string;
     scope: string;
     priority: string;
+    estimatedEffort?: 'small' | 'medium' | 'large' | 'extra-large';
+    potentialRisks?: string[];
+    labels?: string[];
+    formattedDescription?: string;
   }> {
     const { data } = await apiClient.post('/jira/tickets/improve',
       { description, context },

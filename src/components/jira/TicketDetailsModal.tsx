@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   X, User, Calendar, Tag, AlertCircle, Paperclip, MessageCircle,
-  Clock, ChevronDown, ChevronUp, Edit2, Save, XCircle, Plus, Lock, RefreshCw
+  Clock, ChevronDown, ChevronUp, Edit2, Save, XCircle, Plus, Lock, RefreshCw, Sparkles
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
@@ -17,6 +17,8 @@ import CommentTabs from './CommentTabs';
 import HiddenCommentsList from './HiddenCommentsList';
 import HiddenCommentInput from './HiddenCommentInput';
 import type { HiddenComment, CreateHiddenCommentDto } from '../../types/jira.types';
+import MarkdownRenderer from '../ui/MarkdownRenderer';
+import * as J2M from 'jira2md';
 
 interface TicketDetailsModalProps {
   open: boolean;
@@ -99,6 +101,7 @@ const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({
   const [activeCommentTab, setActiveCommentTab] = useState<string>('jira');
   const [showHiddenCommentInput, setShowHiddenCommentInput] = useState(false);
   const [isImproving, setIsImproving] = useState(false);
+  const [showMarkdownPreview, setShowMarkdownPreview] = useState(false);
 
   useEffect(() => {
     if (open && ticketId) {
@@ -160,6 +163,17 @@ const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({
   const handleCancelEdit = () => {
     setEditedDescription(ticketDetails?.description || '');
     setIsEditingDescription(false);
+    setShowMarkdownPreview(false);
+  };
+
+  const convertWikiToMarkdown = (wikiText: string): string => {
+    try {
+      // J2M.toM converts JIRA wiki markup to markdown
+      return J2M.toM(wikiText);
+    } catch (error) {
+      console.error('Failed to convert JIRA wiki to markdown:', error);
+      return wikiText; // Return original text if conversion fails
+    }
   };
 
   const handleImproveDescription = async () => {
@@ -177,8 +191,8 @@ const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({
         `Ticket: ${ticketDetails?.key} - ${ticketDetails?.summary}`
       );
 
-      // Use the improved description
-      setEditedDescription(improved.description);
+      // Use the JIRA-formatted description if available, otherwise fall back to plain description
+      setEditedDescription(improved.formattedDescription || improved.description);
 
       // If not in edit mode, automatically enter edit mode to show the improved version
       if (!isEditingDescription) {
@@ -284,12 +298,34 @@ const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({
     if (isEditingDescription) {
       return (
         <div className="space-y-3">
-          <Textarea
-            value={editedDescription}
-            onChange={(e) => setEditedDescription(e.target.value)}
-            className="min-h-[200px] w-full"
-            placeholder="Enter ticket description..."
-          />
+          <div className="flex gap-2 mb-2">
+            <Button
+              size="sm"
+              variant={showMarkdownPreview ? "outline" : "default"}
+              onClick={() => setShowMarkdownPreview(false)}
+            >
+              Edit
+            </Button>
+            <Button
+              size="sm"
+              variant={showMarkdownPreview ? "default" : "outline"}
+              onClick={() => setShowMarkdownPreview(true)}
+            >
+              Preview
+            </Button>
+          </div>
+          {showMarkdownPreview ? (
+            <div className="border rounded-md p-4 bg-gray-50 min-h-[200px]">
+              <MarkdownRenderer content={convertWikiToMarkdown(editedDescription)} />
+            </div>
+          ) : (
+            <Textarea
+              value={editedDescription}
+              onChange={(e) => setEditedDescription(e.target.value)}
+              className="min-h-[200px] w-full"
+              placeholder="Enter ticket description..."
+            />
+          )}
           <div className="flex gap-2">
             <Button
               size="sm"
@@ -319,6 +355,16 @@ const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({
       );
     }
 
+    // Check if the description contains JIRA wiki markup patterns
+    const hasWikiMarkup = description && (
+      description.includes('h1.') ||
+      description.includes('h2.') ||
+      description.includes('h3.') ||
+      description.includes('{code}') ||
+      description.includes('{color:') ||
+      description.includes('(/)')
+    );
+
     if (renderedDescription) {
       return (
         <div
@@ -327,6 +373,12 @@ const TicketDetailsModal: React.FC<TicketDetailsModalProps> = ({
         />
       );
     }
+
+    // If it has wiki markup, convert and render as markdown
+    if (description && hasWikiMarkup) {
+      return <MarkdownRenderer content={convertWikiToMarkdown(description)} />;
+    }
+
     if (description) {
       return <div className="whitespace-pre-wrap text-sm">{description}</div>;
     }

@@ -12,6 +12,8 @@ import TicketDetailsModal from '../components/jira/TicketDetailsModal';
 import AnalysisMarkdownRenderer from '../components/ui/AnalysisMarkdownRenderer';
 import WorktreeSection from '../components/workflow/WorktreeSection';
 import HappySessionSection from '../components/workflow/HappySessionSection';
+import VerificationResolutionSection from '../components/workflow/VerificationResolutionSection';
+import { VerificationReport } from '../components/pipelines/VerificationReport';
 import jiraService from '../services/jiraService';
 import codeService from '../services/code.service';
 import { toast } from 'react-hot-toast';
@@ -91,6 +93,10 @@ const PipelineDetail = () => {
   const [generatingBranch, setGeneratingBranch] = useState(false);
   const [branchExpanded, setBranchExpanded] = useState(false);
   const [worktreeCreated, setWorktreeCreated] = useState(false);
+
+  // Verification related state
+  const [verificationComplete, setVerificationComplete] = useState(false);
+  const [verificationId, setVerificationId] = useState<string | null>(null);
 
   useEffect(() => {
     // If we don't have ticket data from navigation, fetch it
@@ -690,6 +696,58 @@ const PipelineDetail = () => {
           branchName={branchName}
           worktreeCreated={worktreeCreated}
           analysisStatus={analysisStatus}
+        />
+      )}
+
+      {/* Verification Section - Only show when we have worktree, branch name, and analysis */}
+      {ticket && worktreeCreated && branchName && analysisStatus === 'complete' && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5" />
+                Verification
+              </CardTitle>
+              <Badge variant="outline">
+                Ready for Verification
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <VerificationReport
+              ticketId={ticket.id}
+              onApproveForPR={() => {
+                toast.success('Approved for PR creation');
+                // Could trigger PR creation flow here
+              }}
+              onBackToDevelopment={() => {
+                toast('Returning to development', { icon: '📝' });
+                // Could navigate back to Happy session or refresh state
+              }}
+              onVerificationComplete={(verificationData) => {
+                setVerificationComplete(true);
+                if (verificationData?.id) {
+                  setVerificationId(verificationData.id);
+                }
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Verification Resolution Section */}
+      {verificationComplete && (
+        <VerificationResolutionSection
+          ticketId={ticket.id}
+          verificationId={verificationId}
+          worktreeCreated={worktreeCreated}
+          verificationComplete={verificationComplete}
+          onComplete={() => {
+            // Reset verification state to trigger re-verification
+            setVerificationComplete(false);
+            setVerificationId(null);
+            toast('Re-verification triggered', { icon: '🔄' });
+          }}
         />
       )}
 

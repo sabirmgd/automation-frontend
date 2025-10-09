@@ -171,10 +171,24 @@ const RepositoryModal = ({
                 onChange={(e) => {
                   const url = e.target.value;
                   setFormData({ ...formData, url });
-                  // Try to extract name from URL
-                  const match = url.match(/\/([^\/]+?)(?:\.git)?$/);
-                  if (match) {
-                    setFormData(prev => ({ ...prev, name: match[1] }));
+
+                  // Try to extract owner and name from URL
+                  // Support formats like:
+                  // https://github.com/owner/repo
+                  // https://github.com/owner/repo.git
+                  // git@github.com:owner/repo.git
+                  const githubMatch = url.match(/github\.com[:/]([^/]+)\/([^/\.]+)(?:\.git)?$/);
+                  const gitlabMatch = url.match(/gitlab\.com[:/]([^/]+)\/([^/\.]+)(?:\.git)?$/);
+                  const bitbucketMatch = url.match(/bitbucket\.org[:/]([^/]+)\/([^/\.]+)(?:\.git)?$/);
+
+                  if (githubMatch || gitlabMatch || bitbucketMatch) {
+                    const match = githubMatch || gitlabMatch || bitbucketMatch;
+                    const [, owner, repo] = match;
+                    setFormData(prev => ({
+                      ...prev,
+                      namespace: owner,
+                      name: repo
+                    }));
                   }
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"

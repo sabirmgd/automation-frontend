@@ -27,7 +27,7 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
   const fetchProjects = async () => {
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:3000/projects");
+      const response = await fetch("http://localhost:5556/projects");
       if (response.ok) {
         const data = await response.json();
         // The API returns paginated data with { data: [], total: number, page: number, lastPage: number }

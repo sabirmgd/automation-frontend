@@ -105,6 +105,14 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
       ...data,
       tags: data.tags ? data.tags.split(',').map((tag: string) => tag.trim()).filter(Boolean) : []
     };
+
+    // Remove empty string fields to avoid database constraint issues
+    Object.keys(formData).forEach(key => {
+      if (formData[key] === '' || formData[key] === null) {
+        delete formData[key];
+      }
+    });
+
     await onSubmit(formData);
     reset({
       name: '',

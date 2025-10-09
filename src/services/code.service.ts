@@ -54,7 +54,7 @@ interface TicketWorkflow {
 
 class CodeService {
   private readonly basePath = '/code';
-  private readonly workflowPath = '/workflows';
+  private readonly workflowPath = '/api/workflows';
 
   async createPreliminaryAnalysis(projectId: string, ticketId: string): Promise<AnalysisResponse> {
     const response = await apiClient.post<AnalysisResponse>(

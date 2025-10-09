@@ -3,12 +3,14 @@
 ## ✅ What's Been Implemented
 
 ### 1. **Type Definitions** (`src/types/jira.types.ts`)
+
 - Complete TypeScript types for all Jira entities
 - JiraAccount, JiraBoard, JiraTicket, JiraProject, JiraUser
 - PullRequest integration types
 - DTOs for creating and updating accounts
 
 ### 2. **API Service Layer** (`src/services/jiraService.ts`)
+
 - Full CRUD operations for Jira accounts
 - Board and ticket management
 - Project synchronization
@@ -17,16 +19,20 @@
 - Integration with your existing API client
 
 ### 3. **Comprehensive Jira Management Component** (`src/components/JiraComprehensive.tsx`)
+
 A full-featured component with:
+
 - **Multi-view Navigation**: Accounts → Boards → Tickets
 - **Real-time Statistics**: Live counts for accounts, boards, tickets, and linked PRs
 - **Account Management**:
+
   - View all Jira accounts (Cloud/Server differentiation)
   - Add/Edit/Delete accounts
   - Sync accounts with Jira
   - Visual status indicators
 
 - **Board Management**:
+
   - List all boards for selected account
   - Board type and project key display
   - Ticket counts per board
@@ -41,6 +47,7 @@ A full-featured component with:
   - Sortable/filterable table view
 
 ### 4. **UI Components**
+
 - Tabs component for navigation
 - Card layouts for accounts and boards
 - Table view for tickets
@@ -67,22 +74,25 @@ VITE_API_URL=http://localhost:3001
 ## 🚀 How to Use
 
 1. **Start your backend** (NestJS):
+
    ```bash
    cd /Users/sabirsalah/Desktop/projects/30x/automation
    npm run start:dev
    ```
 
 2. **Start your frontend**:
+
    ```bash
    cd /Users/sabirsalah/Desktop/projects/30x/automation-frontend
    npm run dev
    ```
 
-3. **Navigate to** http://localhost:3000/jira
+3. **Navigate to** http://localhost:5556/jira
 
 ## 📱 Features Available
 
 ### Account Management
+
 - ✅ Add multiple Jira accounts
 - ✅ Support for Cloud and Server instances
 - ✅ Encrypted credential storage (backend)
@@ -90,12 +100,14 @@ VITE_API_URL=http://localhost:3001
 - ✅ Visual differentiation (Cloud vs Server)
 
 ### Board Management
+
 - ✅ View all boards per account
 - ✅ Board type identification
 - ✅ Project association
 - ✅ Ticket counting
 
 ### Ticket Management
+
 - ✅ Complete ticket listing
 - ✅ Status tracking with visual indicators
 - ✅ Priority levels with color coding
@@ -105,6 +117,7 @@ VITE_API_URL=http://localhost:3001
 - ✅ Epic and parent relationships
 
 ### Pull Request Integration
+
 - ✅ Link tickets to PRs
 - ✅ View linked PRs per ticket
 - ✅ PR status tracking
@@ -129,6 +142,7 @@ VITE_API_URL=http://localhost:3001
 ## 📊 Statistics Dashboard
 
 Real-time stats showing:
+
 - Total accounts (active/inactive)
 - Total boards across accounts
 - Open vs closed tickets
@@ -145,21 +159,25 @@ Real-time stats showing:
 ## 🎯 Next Steps (Optional Enhancements)
 
 1. **Advanced Filtering**:
+
    - Filter tickets by status, priority, assignee
    - Search across all fields
    - Date range filters
 
 2. **Bulk Operations**:
+
    - Select multiple tickets
    - Bulk status updates
    - Bulk PR linking
 
 3. **Analytics Dashboard**:
+
    - Velocity charts
    - Burndown charts
    - Team performance metrics
 
 4. **Notifications**:
+
    - Real-time updates via WebSocket
    - Desktop notifications for changes
    - Email digest summaries
@@ -174,10 +192,12 @@ Real-time stats showing:
 If you encounter issues:
 
 1. **API Connection Failed**:
+
    - Check backend is running on port 3001
    - Verify VITE_API_URL in .env
 
 2. **No Data Showing**:
+
    - Check browser console for errors
    - Verify API endpoints are correct
    - Check CORS settings in backend
@@ -201,6 +221,7 @@ If you encounter issues:
 ## ✨ Summary
 
 Your Jira integration is now fully functional with:
+
 - Complete frontend UI components
 - Full API integration
 - Comprehensive account/board/ticket management

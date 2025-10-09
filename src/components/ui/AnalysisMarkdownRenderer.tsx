@@ -66,9 +66,10 @@ const AnalysisMarkdownRenderer: React.FC<AnalysisMarkdownRendererProps> = ({
 
           // Code blocks with syntax highlighting appearance
           code: ({ className, children, ...props }: any) => {
-            const inline = props.inline;
+            // Check if this is an inline code or part of a pre block
+            const isInline = !className?.startsWith('language-');
 
-            if (inline) {
+            if (isInline) {
               return (
                 <code className="px-1.5 py-0.5 bg-gray-200 text-gray-800 rounded text-xs font-mono">
                   {children}
@@ -76,25 +77,35 @@ const AnalysisMarkdownRenderer: React.FC<AnalysisMarkdownRendererProps> = ({
               );
             }
 
-            // For code blocks, try to detect language from className
+            // For code blocks inside pre, just return the code element
+            // The pre component will handle the wrapper
             const language = className?.replace('language-', '') || 'text';
 
             return (
-              <div className="relative group">
-                <div className="absolute top-2 right-2 text-xs text-gray-500 uppercase">
+              <code
+                className="block p-3 bg-gray-900 text-gray-100 rounded-md text-xs font-mono overflow-x-auto"
+                data-language={language}
+              >
+                {children}
+              </code>
+            );
+          },
+          pre: ({ children }) => {
+            // Extract language from code child if available
+            const codeElement = React.Children.toArray(children)[0] as any;
+            const language = codeElement?.props?.['data-language'] || 'text';
+
+            return (
+              <div className="relative group mb-3">
+                <div className="absolute top-2 right-2 text-xs text-gray-500 uppercase z-10">
                   {language}
                 </div>
-                <code className="block p-3 bg-gray-900 text-gray-100 rounded-md text-xs font-mono overflow-x-auto">
+                <pre className="rounded-md overflow-hidden">
                   {children}
-                </code>
+                </pre>
               </div>
             );
           },
-          pre: ({ children }) => (
-            <pre className="mb-3 rounded-md overflow-hidden">
-              {children}
-            </pre>
-          ),
 
           // Blockquotes for important notes
           blockquote: ({ children }) => (

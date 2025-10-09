@@ -59,6 +59,7 @@ export interface JiraTicket {
   jiraCreatedAt?: Date;
   jiraUpdatedAt?: Date;
   lastSyncedAt?: Date;
+  isHidden?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

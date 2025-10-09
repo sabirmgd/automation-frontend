@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   CheckCircle, Circle, Clock, AlertCircle, User,
   RefreshCw, Plus, Settings, ChevronRight, Cloud, Server,
-  Database, GitBranch, ArrowLeft, Filter, Eye, Brain, RotateCw, Layers
+  Database, GitBranch, ArrowLeft, Filter, Eye, EyeOff, Brain, RotateCw, Layers
 } from 'lucide-react';
 import Select from 'react-select';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -40,6 +40,7 @@ const JiraComprehensive = () => {
   const [checkingComments, setCheckingComments] = useState<Set<string>>(new Set());
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [showAllTickets, setShowAllTickets] = useState(false);
+  const [showHiddenTickets, setShowHiddenTickets] = useState(false);
   const [aiFilter, setAiFilter] = useState<'all' | 'with-ai' | 'without-ai'>('all');
   const [syncMode, setSyncMode] = useState<'assigned' | 'all' | 'custom'>('assigned');
   const [customJql, setCustomJql] = useState('');
@@ -82,10 +83,10 @@ const JiraComprehensive = () => {
     }
   };
 
-  const loadTickets = async (boardId: string) => {
+  const loadTickets = async (boardId: string, includeHidden?: boolean) => {
     setLoading(true);
     try {
-      const params: any = { boardId };
+      const params: any = { boardId, includeHidden: includeHidden ?? showHiddenTickets };
 
       const response = await jiraService.getTickets(params);
       setTickets(response?.tickets || []);
@@ -160,6 +161,20 @@ const JiraComprehensive = () => {
   const handleViewTicketDetails = (ticket: JiraTicket) => {
     setSelectedTicket(ticket);
     setShowTicketDetails(true);
+  };
+
+  const handleToggleHidden = async (ticket: JiraTicket) => {
+    try {
+      await jiraService.toggleHiddenTicket(ticket.id);
+      // Update the ticket in the local state
+      setTickets(prev => prev.map(t =>
+        t.id === ticket.id ? {...t, isHidden: !t.isHidden} : t
+      ));
+      toast.success(ticket.isHidden ? 'Ticket unhidden' : 'Ticket hidden');
+    } catch (error) {
+      console.error('Failed to toggle ticket visibility:', error);
+      toast.error('Failed to toggle ticket visibility');
+    }
   };
 
   const handlePipelineView = (ticket: JiraTicket) => {
@@ -308,6 +323,11 @@ const JiraComprehensive = () => {
 
   // Filter tickets based on all filters
   const filteredTickets = tickets.filter(ticket => {
+    // Filter out hidden tickets when showHiddenTickets is false
+    if (!showHiddenTickets && ticket.isHidden) {
+      return false;
+    }
+
     const matchesStatus = statusFilter.length === 0 || statusFilter.includes(ticket.status);
     const matchesPriority = priorityFilter.length === 0 || (ticket.priority && priorityFilter.includes(ticket.priority));
     const matchesAssignee = assigneeFilter.length === 0 ||
@@ -880,21 +900,40 @@ const JiraComprehensive = () => {
                     </span>
                   )}
                 </div>
-                {(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0 || searchQuery || aiFilter !== 'all') && (
+                <div className="flex gap-2">
                   <Button
-                    variant="ghost"
+                    variant={showHiddenTickets ? "default" : "ghost"}
                     size="sm"
                     onClick={() => {
-                      setStatusFilter([]);
-                      setPriorityFilter([]);
-                      setAssigneeFilter([]);
-                      setSearchQuery('');
-                      setAiFilter('all');
+                      const newShowHidden = !showHiddenTickets;
+                      setShowHiddenTickets(newShowHidden);
+                      if (selectedBoard) {
+                        loadTickets(selectedBoard.id, newShowHidden);
+                      }
                     }}
                   >
-                    Clear All Filters
+                    {showHiddenTickets ? <Eye className="w-4 h-4 mr-1" /> : <EyeOff className="w-4 h-4 mr-1" />}
+                    {showHiddenTickets ? 'Hide Hidden' : 'Show Hidden'}
+                    {!showHiddenTickets && tickets.filter(t => t.isHidden).length > 0 && (
+                      <span className="ml-1">({tickets.filter(t => t.isHidden).length})</span>
+                    )}
                   </Button>
-                )}
+                  {(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0 || searchQuery || aiFilter !== 'all') && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setStatusFilter([]);
+                        setPriorityFilter([]);
+                        setAssigneeFilter([]);
+                        setSearchQuery('');
+                        setAiFilter('all');
+                      }}
+                    >
+                      Clear All Filters
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -913,10 +952,17 @@ const JiraComprehensive = () => {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {filteredTickets.map(ticket => (
-                  <tr key={ticket.id} className="hover:bg-gray-50">
+                  <tr key={ticket.id} className={`hover:bg-gray-50 ${ticket.isHidden ? 'opacity-60 bg-gray-50' : ''}`}>
                     <td className="px-6 py-4">
                       <div>
-                        <p className="text-sm font-medium text-blue-600">{ticket.key}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-blue-600">{ticket.key}</p>
+                          {ticket.isHidden && (
+                            <Badge variant="secondary" className="text-xs">
+                              Hidden
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-sm text-gray-900">{ticket.summary}</p>
                       </div>
                     </td>
@@ -997,6 +1043,15 @@ const JiraComprehensive = () => {
                           title="Check for new AI comments"
                         >
                           <RotateCw className={`w-4 h-4 ${checkingComments.has(ticket.id) ? 'animate-spin' : ''}`} />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleToggleHidden(ticket)}
+                          className={`hover:bg-gray-50 ${ticket.isHidden ? 'text-gray-400' : ''}`}
+                          title={ticket.isHidden ? "Unhide ticket" : "Hide ticket"}
+                        >
+                          {ticket.isHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                         </Button>
                       </div>
                     </td>
