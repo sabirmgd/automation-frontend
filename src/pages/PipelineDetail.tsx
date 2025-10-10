@@ -14,6 +14,7 @@ import WorktreeSection from '../components/workflow/WorktreeSection';
 import HappySessionSection from '../components/workflow/HappySessionSection';
 import VerificationResolutionSection from '../components/workflow/VerificationResolutionSection';
 import { VerificationReport } from '../components/pipelines/VerificationReport';
+import { IntegrationTestReport } from '../components/pipelines/IntegrationTestReport';
 import jiraService from '../services/jiraService';
 import codeService from '../services/code.service';
 import { toast } from 'react-hot-toast';
@@ -97,6 +98,10 @@ const PipelineDetail = () => {
   // Verification related state
   const [verificationComplete, setVerificationComplete] = useState(false);
   const [verificationId, setVerificationId] = useState<string | null>(null);
+  const [verificationExpanded, setVerificationExpanded] = useState(false);
+
+  // Testing related state
+  const [testingComplete, setTestingComplete] = useState(false);
 
   useEffect(() => {
     // If we don't have ticket data from navigation, fetch it
@@ -702,36 +707,54 @@ const PipelineDetail = () => {
       {/* Verification Section - Only show when we have worktree, branch name, and analysis */}
       {ticket && worktreeCreated && branchName && analysisStatus === 'complete' && (
         <Card>
-          <CardHeader>
+          <CardHeader className="cursor-pointer" onClick={() => setVerificationExpanded(!verificationExpanded)}>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5" />
                 Verification
               </CardTitle>
-              <Badge variant="outline">
-                Ready for Verification
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">
+                  Ready for Verification
+                </Badge>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setVerificationExpanded(!verificationExpanded);
+                  }}
+                >
+                  {verificationExpanded ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <VerificationReport
-              ticketId={ticket.id}
-              onApproveForPR={() => {
-                toast.success('Approved for PR creation');
-                // Could trigger PR creation flow here
-              }}
-              onBackToDevelopment={() => {
-                toast('Returning to development', { icon: '📝' });
-                // Could navigate back to Happy session or refresh state
-              }}
-              onVerificationComplete={(verificationData) => {
-                setVerificationComplete(true);
-                if (verificationData?.id) {
-                  setVerificationId(verificationData.id);
-                }
-              }}
-            />
-          </CardContent>
+          {verificationExpanded && (
+            <CardContent>
+              <VerificationReport
+                ticketId={ticket.id}
+                onApproveForPR={() => {
+                  toast.success('Approved for PR creation');
+                  // Could trigger PR creation flow here
+                }}
+                onBackToDevelopment={() => {
+                  toast('Returning to development', { icon: '📝' });
+                  // Could navigate back to Happy session or refresh state
+                }}
+                onVerificationComplete={(verificationData) => {
+                  setVerificationComplete(true);
+                  if (verificationData?.id) {
+                    setVerificationId(verificationData.id);
+                  }
+                }}
+              />
+            </CardContent>
+          )}
         </Card>
       )}
 
@@ -743,26 +766,25 @@ const PipelineDetail = () => {
           worktreeCreated={worktreeCreated}
           verificationComplete={verificationComplete}
           onComplete={() => {
-            // Reset verification state to trigger re-verification
-            setVerificationComplete(false);
-            setVerificationId(null);
-            toast('Re-verification triggered', { icon: '🔄' });
+            // Resolution complete
+            toast('Verification resolution complete', { icon: '✅' });
           }}
         />
       )}
 
-      {/* Pipeline Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Pipeline Information</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-12 text-muted-foreground">
-            <p>Pipeline details will be displayed here</p>
-            <p className="text-sm mt-2">This section will show build status, test results, and deployment information</p>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Integration Testing Section - Always visible as a pipeline stage */}
+      {ticket && (
+        <IntegrationTestReport
+          ticketId={ticket.id}
+          onTestsComplete={(result) => {
+            setTestingComplete(true);
+            toast.success('Integration tests completed!');
+          }}
+          onApproveTests={() => {
+            toast.success('Tests approved! Ready for PR.');
+          }}
+        />
+      )}
 
       {/* Ticket Details Modal */}
       <TicketDetailsModal

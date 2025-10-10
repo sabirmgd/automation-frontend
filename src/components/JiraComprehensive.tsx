@@ -34,6 +34,7 @@ const JiraComprehensive = () => {
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [assigneeFilter, setAssigneeFilter] = useState<string[]>([]);
+  const [stageFilter, setStageFilter] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [analyzingTickets, setAnalyzingTickets] = useState<Set<string>>(new Set());
   const [ticketsWithNewAIComments, setTicketsWithNewAIComments] = useState<Set<string>>(new Set());
@@ -89,7 +90,28 @@ const JiraComprehensive = () => {
       const params: any = { boardId, includeHidden: includeHidden ?? showHiddenTickets };
 
       const response = await jiraService.getTickets(params);
-      setTickets(response?.tickets || []);
+      const loadedTickets = response?.tickets || [];
+
+      // Fetch workflow status for each ticket
+      const ticketsWithWorkflow = await Promise.all(
+        loadedTickets.map(async (ticket) => {
+          try {
+            const workflow = await codeService.getWorkflowByTicketId(ticket.id);
+            return {
+              ...ticket,
+              workflowStage: workflow?.status || 'not_started'
+            };
+          } catch (error) {
+            // If no workflow exists, default to not_started
+            return {
+              ...ticket,
+              workflowStage: 'not_started'
+            };
+          }
+        })
+      );
+
+      setTickets(ticketsWithWorkflow);
     } catch (error) {
       console.error('Failed to load tickets:', error);
       setTickets([]);
@@ -304,13 +326,86 @@ const JiraComprehensive = () => {
     }
   };
 
+  const getWorkflowStageDisplay = (stage: string | undefined) => {
+    if (!stage || stage === 'not_started') return 'Not Started';
+
+    const stageMap: Record<string, string> = {
+      'analysis': 'Analysis',
+      'branch_generated': 'Branch',
+      'worktree_created': 'Worktree',
+      'development': 'Development',
+      'development_complete': 'Dev Complete',
+      'verifying': 'Verifying',
+      'verification_complete': 'Verified',
+      'verification_resolution_in_progress': 'Fixing',
+      'verification_resolution_complete': 'Fixed',
+      'testing_in_progress': 'Testing',
+      'testing_complete': 'Tested',
+      'testing_partial': 'Partial Test',
+      'testing_failed': 'Test Failed',
+      'testing_needs_fix': 'Needs Fix',
+      'ready_for_pr': 'Ready for PR',
+      'pr_created': 'PR Created',
+      'in_review': 'In Review',
+      'completed': 'Completed',
+      'error': 'Error',
+    };
+
+    return stageMap[stage] || stage;
+  };
+
+  const getWorkflowStageColor = (stage: string | undefined) => {
+    if (!stage || stage === 'not_started') {
+      return 'bg-gray-100 text-gray-600 border-gray-200';
+    }
+
+    // Blue for initial stages
+    if (['analysis', 'branch_generated', 'worktree_created', 'development'].includes(stage)) {
+      return 'bg-blue-100 text-blue-700 border-blue-200';
+    }
+
+    // Orange for verification/testing
+    if (['verifying', 'testing_in_progress'].includes(stage)) {
+      return 'bg-orange-100 text-orange-700 border-orange-200';
+    }
+
+    // Green for completed stages
+    if (['verification_complete', 'testing_complete', 'ready_for_pr', 'pr_created', 'completed'].includes(stage)) {
+      return 'bg-green-100 text-green-700 border-green-200';
+    }
+
+    // Red for errors/failures
+    if (['testing_failed', 'testing_needs_fix', 'error'].includes(stage)) {
+      return 'bg-red-100 text-red-700 border-red-200';
+    }
+
+    // Yellow for in-progress fixes
+    if (['verification_resolution_in_progress', 'development_complete'].includes(stage)) {
+      return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+    }
+
+    return 'bg-gray-100 text-gray-600 border-gray-200';
+  };
+
   // Get unique values for filters
   const uniqueStatuses = Array.from(new Set(tickets.map(t => t.status))).sort();
   const uniquePriorities = Array.from(new Set(tickets.map(t => t.priority).filter(Boolean))).sort();
+  const uniqueStages = Array.from(new Set(tickets.map(t => t.workflowStage || 'not_started')))
+    .sort((a, b) => {
+      // Custom sort to put stages in logical order
+      const stageOrder = ['not_started', 'analysis', 'branch_generated', 'worktree_created',
+        'development', 'development_complete', 'verifying', 'verification_complete',
+        'testing_in_progress', 'testing_complete', 'ready_for_pr', 'pr_created', 'completed'];
+      return stageOrder.indexOf(a) - stageOrder.indexOf(b);
+    });
 
   // Convert to react-select options
   const statusOptions = uniqueStatuses.map(status => ({ value: status, label: status }));
   const priorityOptions = uniquePriorities.map(priority => ({ value: priority!, label: priority! }));
+  const stageOptions = uniqueStages.map(stage => ({
+    value: stage,
+    label: getWorkflowStageDisplay(stage)
+  }));
 
   // Use all users for assignee options, not just those in current tickets
   const assigneeOptions = [
@@ -333,13 +428,14 @@ const JiraComprehensive = () => {
     const matchesAssignee = assigneeFilter.length === 0 ||
       (assigneeFilter.includes('unassigned') && !ticket.assignee) ||
       (ticket.assignee && assigneeFilter.includes(ticket.assignee.accountId));
+    const matchesStage = stageFilter.length === 0 || stageFilter.includes(ticket.workflowStage || 'not_started');
     const matchesSearch = searchQuery === '' ||
       ticket.key.toLowerCase().includes(searchQuery.toLowerCase()) ||
       ticket.summary.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesAI = aiFilter === 'all' ||
       (aiFilter === 'with-ai' && ticketsWithNewAIComments.has(ticket.id)) ||
       (aiFilter === 'without-ai' && !ticketsWithNewAIComments.has(ticket.id));
-    return matchesStatus && matchesPriority && matchesAssignee && matchesSearch && matchesAI;
+    return matchesStatus && matchesPriority && matchesAssignee && matchesStage && matchesSearch && matchesAI;
   });
 
   const stats = {
@@ -625,6 +721,7 @@ const JiraComprehensive = () => {
                           const modeText = syncMode === 'all' ? 'all' : syncMode === 'custom' ? 'custom query' : 'assigned';
                           console.log(`Syncing ${modeText} tickets for ${selectedBoard.name}`);
                         }
+                        // Reload tickets with workflow data
                         await loadTickets(selectedBoard.id);
 
                         const successMsg = showAllTickets
@@ -876,6 +973,22 @@ const JiraComprehensive = () => {
                   />
                 </div>
                 <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Stage</label>
+                  <Select
+                    isMulti
+                    options={stageOptions}
+                    value={stageOptions.filter(opt => stageFilter.includes(opt.value))}
+                    onChange={(selected) => setStageFilter(selected.map(s => s.value))}
+                    placeholder="Select stages..."
+                    className="text-sm"
+                    classNamePrefix="react-select"
+                    styles={{
+                      control: (base) => ({...base, minHeight: '36px', borderColor: '#d1d5db'}),
+                      multiValue: (base) => ({...base, backgroundColor: '#e5e7eb'})
+                    }}
+                  />
+                </div>
+                <div>
                   <label className="text-sm font-medium text-gray-700 mb-1 block">Search</label>
                   <input
                     type="text"
@@ -889,11 +1002,12 @@ const JiraComprehensive = () => {
               <div className="flex justify-between items-center mt-4">
                 <div className="text-sm text-gray-600">
                   Showing <span className="font-semibold">{filteredTickets.length}</span> of {tickets.length} {showAllTickets ? 'project' : 'board'} tickets
-                  {(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0 || searchQuery || aiFilter !== 'all') && (
+                  {(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0 || stageFilter.length > 0 || searchQuery || aiFilter !== 'all') && (
                     <span className="ml-2">
                       ({statusFilter.length > 0 && `${statusFilter.length} status${statusFilter.length > 1 ? 'es' : ''}`}
                       {priorityFilter.length > 0 && `${statusFilter.length > 0 ? ', ' : ''}${priorityFilter.length} priorit${priorityFilter.length > 1 ? 'ies' : 'y'}`}
                       {assigneeFilter.length > 0 && `${(statusFilter.length > 0 || priorityFilter.length > 0) ? ', ' : ''}${assigneeFilter.length} assignee${assigneeFilter.length > 1 ? 's' : ''}`}
+                      {stageFilter.length > 0 && `${(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0) ? ', ' : ''}${stageFilter.length} stage${stageFilter.length > 1 ? 's' : ''}`}
                       {searchQuery && `${(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0) ? ', ' : ''}search: "${searchQuery}"`}
                       {aiFilter === 'with-ai' && `${(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0 || searchQuery) ? ', ' : ''}with AI replies`}
                       {aiFilter === 'without-ai' && `${(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0 || searchQuery) ? ', ' : ''}without AI replies`})
@@ -918,7 +1032,7 @@ const JiraComprehensive = () => {
                       <span className="ml-1">({tickets.filter(t => t.isHidden).length})</span>
                     )}
                   </Button>
-                  {(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0 || searchQuery || aiFilter !== 'all') && (
+                  {(statusFilter.length > 0 || priorityFilter.length > 0 || assigneeFilter.length > 0 || stageFilter.length > 0 || searchQuery || aiFilter !== 'all') && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -926,6 +1040,7 @@ const JiraComprehensive = () => {
                         setStatusFilter([]);
                         setPriorityFilter([]);
                         setAssigneeFilter([]);
+                        setStageFilter([]);
                         setSearchQuery('');
                         setAiFilter('all');
                       }}
@@ -944,6 +1059,7 @@ const JiraComprehensive = () => {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Issue</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stage</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assignee</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">PRs</th>
@@ -971,6 +1087,11 @@ const JiraComprehensive = () => {
                         {getStatusIcon(ticket.status)}
                         <span className="text-sm">{ticket.status}</span>
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 text-xs font-medium rounded border ${getWorkflowStageColor(ticket.workflowStage)}`}>
+                        {getWorkflowStageDisplay(ticket.workflowStage)}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       {ticket.priority && (

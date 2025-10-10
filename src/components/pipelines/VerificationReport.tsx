@@ -125,10 +125,10 @@ export const VerificationReport: React.FC<VerificationReportProps> = ({
         setCustomInstructions('');
         setIsVerifying(true);
 
-        // Start polling for results every 3 seconds
+        // Start polling for results every 15 seconds
         const interval = setInterval(() => {
           fetchVerification(true);
-        }, 3000);
+        }, 15000);
         setPollingInterval(interval);
 
         // Also do an immediate check after 2 seconds
@@ -137,10 +137,10 @@ export const VerificationReport: React.FC<VerificationReportProps> = ({
         toast('Verification is already running!', { icon: '⚠️' });
         setIsVerifying(true);
 
-        // Start polling
+        // Start polling every 15 seconds
         const interval = setInterval(() => {
           fetchVerification(true);
-        }, 3000);
+        }, 15000);
         setPollingInterval(interval);
       } else {
         // Direct response (shouldn't happen with background processing, but handle it)

@@ -20,6 +20,7 @@ const projectSchema = z.object({
   gitlabUrl: z.string().optional(),
   jiraUrl: z.string().optional(),
   agentNavigationInfo: z.string().optional(),
+  accessToken: z.string().optional(),
 });
 
 interface ProjectModalProps {
@@ -60,7 +61,8 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
       jiraKey: '',
       gitlabUrl: '',
       jiraUrl: '',
-      agentNavigationInfo: ''
+      agentNavigationInfo: '',
+      accessToken: ''
     }
   });
 
@@ -80,7 +82,8 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
         jiraKey: project.jiraKey || '',
         gitlabUrl: project.gitlabUrl || '',
         jiraUrl: project.jiraUrl || '',
-        agentNavigationInfo: project.agentNavigationInfo || ''
+        agentNavigationInfo: project.agentNavigationInfo || '',
+        accessToken: project.accessToken || ''
       });
     } else {
       reset({
@@ -95,7 +98,8 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
         jiraKey: '',
         gitlabUrl: '',
         jiraUrl: '',
-        agentNavigationInfo: ''
+        agentNavigationInfo: '',
+        accessToken: ''
       });
     }
   }, [project, reset]);
@@ -126,7 +130,8 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
       jiraKey: '',
       gitlabUrl: '',
       jiraUrl: '',
-      agentNavigationInfo: ''
+      agentNavigationInfo: '',
+      accessToken: ''
     });
     onClose();
   };
@@ -261,6 +266,21 @@ const ProjectModal: React.FC<ProjectModalProps> = ({
               onChange={(value) => setValue('localPath', value as string)}
               placeholder="Enter project path"
             />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Access Token
+            </label>
+            <input
+              {...register('accessToken')}
+              type="password"
+              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Enter access token"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Optional access token for backend authentication
+            </p>
           </div>
 
           <div className="mb-6">

@@ -60,6 +60,7 @@ export interface JiraTicket {
   jiraUpdatedAt?: Date;
   lastSyncedAt?: Date;
   isHidden?: boolean;
+  workflowStage?: string; // Add workflow stage from TicketWorkflow
   createdAt: Date;
   updatedAt: Date;
 }

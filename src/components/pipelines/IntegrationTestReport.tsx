@@ -2,17 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Separator } from '../ui/separator';
-import { Badge } from '../ui/badge';
 import {
   PlayCircle,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
   Loader2,
   RefreshCw,
-  FileText,
   ThumbsUp,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import AnalysisMarkdownRenderer from '../ui/AnalysisMarkdownRenderer';
 import { toast } from 'react-hot-toast';
@@ -54,6 +50,7 @@ export const IntegrationTestReport: React.FC<IntegrationTestReportProps> = ({
   const [loading, setLoading] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+  const [isReportExpanded, setIsReportExpanded] = useState(true);
 
   // Fetch latest test results
   const fetchTestResults = async (isPolling = false) => {
@@ -73,7 +70,7 @@ export const IntegrationTestReport: React.FC<IntegrationTestReportProps> = ({
           clearInterval(pollingInterval);
           setPollingInterval(null);
         }
-        toast.success('Integration testing completed!');
+        toast.success('Testing completed! Check the report for results.');
       }
 
       // Notify parent
@@ -82,10 +79,19 @@ export const IntegrationTestReport: React.FC<IntegrationTestReportProps> = ({
       }
     } catch (err: any) {
       if (err.response?.status === 404) {
+        // 404 is expected when no test results exist yet, handle silently
         setTestResult(null);
+        // Don't log anything for expected 404s during polling
+        if (!isPolling) {
+          // Only log if not polling, as 404s during initial load might be worth noting
+          console.debug('No integration test results found yet');
+        }
       } else if (!isPolling) {
+        // Only show error toast for non-polling requests and non-404 errors
+        console.error('Failed to load test results:', err);
         toast.error('Failed to load test results');
       }
+      // For polling requests with non-404 errors, silently continue polling
     } finally {
       if (!isPolling) {
         setLoading(false);
@@ -103,7 +109,7 @@ export const IntegrationTestReport: React.FC<IntegrationTestReportProps> = ({
       );
 
       if (response.data.status === 'processing') {
-        toast('Integration tests started! This will take a few minutes...', {
+        toast('Testing agent started! Starting server and running curl tests...', {
           icon: '🧪',
           duration: 4000
         });
@@ -111,22 +117,22 @@ export const IntegrationTestReport: React.FC<IntegrationTestReportProps> = ({
         setCustomInstructions('');
         setIsTesting(true);
 
-        // Start polling every 3 seconds
+        // Start polling every 15 seconds
         const interval = setInterval(() => {
           fetchTestResults(true);
-        }, 3000);
+        }, 15000);
         setPollingInterval(interval);
 
         // Initial check after 2 seconds
         setTimeout(() => fetchTestResults(true), 2000);
       } else if (response.data.status === 'already_running') {
-        toast('Integration tests are already running!', { icon: '⚠️' });
+        toast('Testing agent is already running!', { icon: '⚠️' });
         setIsTesting(true);
 
-        // Start polling
+        // Start polling every 15 seconds
         const interval = setInterval(() => {
           fetchTestResults(true);
-        }, 3000);
+        }, 15000);
         setPollingInterval(interval);
       }
     } catch (err: any) {
@@ -182,156 +188,114 @@ export const IntegrationTestReport: React.FC<IntegrationTestReportProps> = ({
   const testStatus = getTestStatus();
 
   return (
-    <div className="space-y-4">
-      {/* Action Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Integration Testing</CardTitle>
-          <CardDescription>
-            Run integration tests to verify the implementation works correctly
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {/* Test Status */}
-          {testResult && (
-            <div className="mb-4">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  {testStatus === 'passed' ? (
-                    <CheckCircle className="h-5 w-5 text-green-500" />
-                  ) : testStatus === 'partial' ? (
-                    <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                  ) : testStatus === 'failed' ? (
-                    <XCircle className="h-5 w-5 text-red-500" />
-                  ) : null}
-                  <span className="font-medium">
-                    {testResult.endpointsPassed}/{testResult.endpointsTested} tests passed
-                  </span>
-                </div>
-                {testResult.avgResponseTimeMs && (
-                  <Badge variant="secondary">
-                    Avg: {testResult.avgResponseTimeMs.toFixed(0)}ms
-                  </Badge>
+    <Card>
+      <CardHeader>
+        <CardTitle>Testing Agent</CardTitle>
+        <CardDescription>
+          Agent starts the backend and tests endpoints with curl requests
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Test Report */}
+        {testResult && (
+          <div>
+            <div
+              className="flex items-center justify-between mb-3 cursor-pointer hover:opacity-80"
+              onClick={() => setIsReportExpanded(!isReportExpanded)}
+            >
+              <h4 className="text-sm font-medium flex items-center gap-2">
+                Test Report
+                {isReportExpanded ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
                 )}
-                <Badge variant={testResult.cleanupStatus === 'success' ? 'default' : 'destructive'}>
-                  Cleanup: {testResult.cleanupStatus}
-                </Badge>
-              </div>
+              </h4>
             </div>
+
+            {isReportExpanded && (
+              <AnalysisMarkdownRenderer
+                content={testResult.fullReport}
+                maxHeight="max-h-96"
+              />
+            )}
+          </div>
+        )}
+
+        {/* Custom Instructions */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">
+            Custom Testing Instructions (optional)
+          </label>
+          <Textarea
+            value={customInstructions}
+            onChange={(e) => setCustomInstructions(e.target.value)}
+            placeholder="e.g., Focus on specific endpoints, test error handling, check specific scenarios..."
+            rows={3}
+            className="resize-none"
+          />
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <Button
+            onClick={runIntegrationTests}
+            disabled={loading || isTesting}
+            className="flex items-center gap-2"
+          >
+            {isTesting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Testing...
+              </>
+            ) : (
+              <>
+                <PlayCircle className="h-4 w-4" />
+                {testResult ? 'Rerun Tests' : 'Run Tests'}
+              </>
+            )}
+          </Button>
+
+          {testResult && (
+            <Button
+              variant="outline"
+              onClick={() => fetchTestResults()}
+              disabled={loading}
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
           )}
 
-          {/* Custom Instructions */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Custom Testing Instructions (optional)
-            </label>
-            <Textarea
-              value={customInstructions}
-              onChange={(e) => setCustomInstructions(e.target.value)}
-              placeholder="e.g., Focus on authentication endpoints, skip database checks..."
-              rows={3}
-              className="resize-none"
-            />
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 mt-4">
+          {testStatus === 'passed' && (
             <Button
-              onClick={runIntegrationTests}
-              disabled={loading || isTesting}
-              className="flex items-center gap-2"
+              variant="success"
+              onClick={handleApproveTests}
+              disabled={loading}
+              className="ml-auto flex items-center gap-2"
             >
-              {isTesting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Testing...
-                </>
-              ) : (
-                <>
-                  <PlayCircle className="h-4 w-4" />
-                  Run Tests
-                </>
-              )}
+              <ThumbsUp className="h-4 w-4" />
+              Approve for PR
             </Button>
+          )}
+        </div>
 
-            {testResult && (
-              <Button
-                variant="outline"
-                onClick={() => fetchTestResults()}
-                disabled={loading}
-              >
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-            )}
-
-            {testStatus === 'passed' && (
-              <Button
-                variant="success"
-                onClick={handleApproveTests}
-                disabled={loading}
-                className="ml-auto flex items-center gap-2"
-              >
-                <ThumbsUp className="h-4 w-4" />
-                Approve for PR
-              </Button>
-            )}
+        {/* Loading State */}
+        {loading && !testResult && (
+          <div className="flex flex-col items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-500 mb-4" />
+            <p className="text-sm text-gray-500">Loading test results...</p>
           </div>
-        </CardContent>
-      </Card>
+        )}
 
-      {/* Test Report */}
-      {testResult && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Test Report
-            </CardTitle>
-            <CardDescription>
-              Generated at {new Date(testResult.createdAt).toLocaleString()}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="prose prose-sm max-w-none">
-              <AnalysisMarkdownRenderer content={testResult.fullReport} />
-            </div>
-
-            {/* Cleanup Issues */}
-            {testResult.cleanupIssues && (
-              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
-                <h4 className="font-medium text-red-800 mb-2">Cleanup Issues</h4>
-                <pre className="text-sm text-red-700 whitespace-pre-wrap">
-                  {testResult.cleanupIssues}
-                </pre>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Loading State */}
-      {loading && !testResult && (
-        <Card>
-          <CardContent className="p-8">
-            <div className="flex flex-col items-center justify-center text-center">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-500 mb-4" />
-              <p className="text-sm text-gray-500">Loading test results...</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Empty State */}
-      {!loading && !testResult && !isTesting && (
-        <Card>
-          <CardContent className="p-8">
-            <div className="text-center text-gray-500">
-              <PlayCircle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-              <p>No test results yet. Run integration tests to verify the implementation.</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+        {/* Testing State */}
+        {isTesting && !testResult && (
+          <div className="flex flex-col items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-500 mb-4" />
+            <p className="text-sm text-gray-500">Testing agent is running...</p>
+            <p className="text-xs text-gray-400 mt-2">This may take a few minutes</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
